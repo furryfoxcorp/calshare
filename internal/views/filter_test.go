@@ -135,3 +135,70 @@ func TestRecurrencePreserved(t *testing.T) {
 		t.Errorf("RRULE should be preserved:\n%s", s)
 	}
 }
+
+const recurringWithPrivateOverride = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//t//EN
+BEGIN:VEVENT
+UID:series-1
+DTSTAMP:20260101T000000Z
+DTSTART;TZID=America/New_York:20260105T090000
+DTEND;TZID=America/New_York:20260105T093000
+RRULE:FREQ=WEEKLY;COUNT=5
+SUMMARY:Standup
+END:VEVENT
+BEGIN:VEVENT
+UID:series-1
+DTSTAMP:20260101T000000Z
+RECURRENCE-ID;TZID=America/New_York:20260112T090000
+DTSTART;TZID=America/New_York:20260112T090000
+DTEND;TZID=America/New_York:20260112T093000
+CLASS:PRIVATE
+SUMMARY:Private one-off
+END:VEVENT
+END:VCALENDAR
+`
+
+func TestPrivateOverrideBecomesExdate(t *testing.T) {
+	out, err := Apply(parse(t, recurringWithPrivateOverride), Spec{Preset: PresetFull, IncludeTentative: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := emit(t, out)
+	// The master with RRULE survives.
+	if !strings.Contains(s, "RRULE:FREQ=WEEKLY;COUNT=5") {
+		t.Errorf("master RRULE missing:\n%s", s)
+	}
+	// The private instance is excluded via EXDATE with the master's TZID.
+	if !strings.Contains(s, "EXDATE;TZID=America/New_York:20260112T090000") {
+		t.Errorf("EXDATE for private instance missing:\n%s", s)
+	}
+	// The private override itself must not appear.
+	if strings.Contains(s, "Private one-off") {
+		t.Error("private override leaked into output")
+	}
+}
+
+func TestExcludedMasterPromotesPublicOverride(t *testing.T) {
+	// Master is private (excluded by default), the override is public.
+	body := strings.Replace(recurringWithPrivateOverride, "SUMMARY:Standup", "SUMMARY:Standup\nCLASS:PRIVATE", 1)
+	body = strings.Replace(body, "CLASS:PRIVATE\nSUMMARY:Private one-off", "SUMMARY:Public exception", 1)
+
+	out, err := Apply(parse(t, body), Spec{Preset: PresetFull, IncludeTentative: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := emit(t, out)
+	if strings.Contains(s, "FREQ=WEEKLY") {
+		t.Errorf("excluded master's weekly RRULE should not appear:\n%s", s)
+	}
+	if !strings.Contains(s, "Public exception") {
+		t.Errorf("public override should be promoted:\n%s", s)
+	}
+	if !strings.Contains(s, "UID:series-1-") {
+		t.Errorf("promoted override should get a suffixed UID:\n%s", s)
+	}
+	if strings.Contains(s, "RECURRENCE-ID") {
+		t.Error("promoted standalone event should drop RECURRENCE-ID")
+	}
+}

@@ -16,20 +16,123 @@ func Apply(src *goical.Calendar, s Spec) (*goical.Calendar, error) {
 	out.Props.SetText("VERSION", "2.0")
 	out.Props.SetText("PRODID", "-//furryfoxcorp//calshare//EN")
 
+	// Group VEVENTs by UID so a recurring master and its RECURRENCE-ID
+	// overrides are filtered together.
+	order := []string{}
+	groups := map[string][]*goical.Component{}
 	for _, child := range src.Children {
 		if child.Name != ical.CompEvent {
 			continue // drop VTODO and any source VTIMEZONE; we regenerate zones
 		}
-		if dropByFlags(child, s) {
-			continue
+		uid := propValue(child, "UID")
+		if _, seen := groups[uid]; !seen {
+			order = append(order, uid)
 		}
-		out.Children = append(out.Children, filterEvent(child, rules, s.busyLabel()))
+		groups[uid] = append(groups[uid], child)
+	}
+
+	for _, uid := range order {
+		out.Children = append(out.Children, filterSeries(groups[uid], rules, s)...)
 	}
 
 	if err := ical.BundleTimezones(out); err != nil {
 		return nil, err
 	}
 	return out, nil
+}
+
+// filterSeries applies the view to one UID's components (a master plus any
+// RECURRENCE-ID overrides), implementing the recurrence-under-filters rules:
+// failed override instances become EXDATEs on the master, and surviving
+// overrides of an excluded master are promoted to standalone events.
+func filterSeries(comps []*goical.Component, rules map[string]Rule, s Spec) []*goical.Component {
+	var master *goical.Component
+	var overrides []*goical.Component
+	for _, c := range comps {
+		if c.Props.Get("RECURRENCE-ID") == nil && master == nil {
+			master = c
+		} else if c.Props.Get("RECURRENCE-ID") != nil {
+			overrides = append(overrides, c)
+		}
+	}
+
+	// No recurring master: filter each surviving component independently.
+	if master == nil || master.Props.Get("RRULE") == nil {
+		var out []*goical.Component
+		for _, c := range comps {
+			if !dropByFlags(c, s) {
+				out = append(out, filterEvent(c, rules, s.busyLabel()))
+			}
+		}
+		return out
+	}
+
+	masterTZID := tzidOf(master, "DTSTART")
+
+	if !dropByFlags(master, s) {
+		// Master is included. Keep it; reconcile overrides.
+		kept := filterEvent(master, rules, s.busyLabel())
+		var out []*goical.Component
+		for _, ov := range overrides {
+			if dropByFlags(ov, s) {
+				addExdate(kept, ov, masterTZID) // hide this instance
+			} else {
+				out = append(out, filterEvent(ov, rules, s.busyLabel()))
+			}
+		}
+		return append([]*goical.Component{kept}, out...)
+	}
+
+	// Master is excluded. Promote any surviving override to a standalone event.
+	var out []*goical.Component
+	for _, ov := range overrides {
+		if dropByFlags(ov, s) {
+			continue
+		}
+		promoted := filterEvent(ov, rules, s.busyLabel())
+		rid := propValue(ov, "RECURRENCE-ID")
+		delete(promoted.Props, "RECURRENCE-ID")
+		delete(promoted.Props, "RRULE")
+		uid := propValue(ov, "UID")
+		promoted.Props["UID"] = []goical.Prop{{Name: "UID", Value: uid + "-" + sanitizeID(rid)}}
+		out = append(out, promoted)
+	}
+	return out
+}
+
+// tzidOf returns the TZID parameter of a property, if any.
+func tzidOf(c *goical.Component, prop string) string {
+	if p := c.Props.Get(prop); p != nil && p.Params != nil {
+		return p.Params.Get("TZID")
+	}
+	return ""
+}
+
+// addExdate appends an EXDATE to the master for the override's RECURRENCE-ID,
+// matching the master DTSTART's TZID (the most common published-feed bug).
+func addExdate(master, override *goical.Component, masterTZID string) {
+	rid := override.Props.Get("RECURRENCE-ID")
+	if rid == nil {
+		return
+	}
+	ex := goical.Prop{Name: "EXDATE", Value: rid.Value}
+	if masterTZID != "" {
+		ex.Params = goical.Params{"TZID": []string{masterTZID}}
+	}
+	master.Props["EXDATE"] = append(master.Props["EXDATE"], ex)
+}
+
+func sanitizeID(s string) string {
+	out := make([]rune, 0, len(s))
+	for _, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
+			out = append(out, r)
+		default:
+			out = append(out, '-')
+		}
+	}
+	return string(out)
 }
 
 func propValue(c *goical.Component, name string) string {
