@@ -8,6 +8,10 @@ docs/
 /dist/
 *.exe
 
+# giftwrap output
+/_build/
+/_dist/
+
 # Local database and runtime state
 *.sqlite
 *.sqlite-shm

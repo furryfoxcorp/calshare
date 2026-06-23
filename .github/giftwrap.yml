@@ -1,0 +1,25 @@
+# Packaging config for giftwrap (https://github.com/indrora/giftwrap).
+# Build a release locally or in CI with:
+#   giftwrap release
+# Version comes from the current semver git tag (for example v0.1.0).
+name: caldav-share
+nameTemplate: "{{.Name}}-{{.Version}}-{{.OS}}-{{.Arch}}"
+
+# The binary is fully static: modernc.org/sqlite is pure Go, so cgo stays off
+# and the result runs on distroless/scratch.
+env:
+  CGO_ENABLED: "0"
+
+include:
+  - LICENSE
+  - README.md
+
+targets:
+  default:
+    package: github.com/furryfoxcorp/calshare/cmd/caldav-share
+    flags: -trimpath -ldflags "-s -w"
+    platforms:
+      - linux/amd64
+      - linux/arm64
+      - darwin/amd64
+      - darwin/arm64
