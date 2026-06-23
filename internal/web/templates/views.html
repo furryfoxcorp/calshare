@@ -1,0 +1,42 @@
+{{define "title"}}Views - calshare{{end}}
+{{define "content"}}
+<h2>Views</h2>
+<p class="sub">A view is a filtered slice of your calendars that you can hand to someone as a subscribe link.</p>
+
+<section>
+  <p class="group-label">Your views</p>
+  <div class="panel">
+    {{if .Data.Views}}
+      {{range .Data.Views}}
+      <div class="row">
+        <span class="grow"><span class="title">{{.Name}}</span>
+          <div class="meta">{{.Preset}} preset</div>
+        </span>
+        <a class="btn btn-secondary btn-sm" href="/views/{{.ID}}">Edit</a>
+      </div>
+      {{end}}
+    {{else}}
+      <div class="empty">No views yet. Create one to share parts of your calendar.</div>
+    {{end}}
+  </div>
+</section>
+
+<section>
+  <p class="group-label">New view</p>
+  <form method="post" action="/views">
+    <div class="field">
+      <label for="name">Name</label>
+      <input type="text" id="name" name="name" placeholder="What Zoe sees" required>
+    </div>
+    <div class="field">
+      <label for="preset">Privacy preset</label>
+      <select id="preset" name="preset">
+        <option value="busy">Busy only (hide titles and details)</option>
+        <option value="titles" selected>Titles (show titles, hide details)</option>
+        <option value="full">Full (show everything)</option>
+      </select>
+    </div>
+    <div class="actions"><button class="btn" type="submit">Create view</button></div>
+  </form>
+</section>
+{{end}}

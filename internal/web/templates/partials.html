@@ -16,6 +16,57 @@
 {{end}}
 {{end}}
 
+{{define "sourceList"}}
+{{if .}}
+  {{range .}}
+  <div class="row">
+    <span class="swatch" style="background:{{if .Color}}{{.Color}}{{else}}#46a83c{{end}}"></span>
+    <span class="grow"><span class="title">{{.DisplayName}}</span>
+      <div class="meta">
+        {{if .ICSLastStatus}}{{.ICSLastStatus}}{{else}}not polled yet{{end}}{{if .ICSLastPolledAt}} &middot; last checked {{date .ICSLastPolledAt}}{{end}}{{if .ICSLastError}} &middot; {{.ICSLastError}}{{end}}
+      </div>
+    </span>
+    <button class="btn btn-secondary btn-sm" hx-post="/sources/{{.ID}}/poll" hx-target="#source-list" hx-swap="innerHTML">Check now</button>
+    <button class="btn btn-danger btn-sm" hx-post="/calendars/{{.ID}}/delete" hx-target="#source-list" hx-swap="innerHTML" hx-confirm="Remove this subscription and its events?">Remove</button>
+  </div>
+  {{end}}
+{{else}}
+  <div class="empty">No subscriptions yet. Add one below.</div>
+{{end}}
+{{end}}
+
+{{define "tokenList"}}
+{{if .Tokens}}
+  {{range .Tokens}}
+  <div class="row">
+    <span class="grow"><span class="title">{{.Label}}</span>
+      <div class="meta">Created {{date .CreatedAt}}{{if .ExpiresAt}} &middot; expires {{date .ExpiresAt}}{{end}}{{if .HasPassword}} &middot; password set{{end}} &middot; fetched {{.AccessCount}} time{{if ne .AccessCount 1}}s{{end}}</div>
+    </span>
+    <button class="btn btn-danger btn-sm"
+      hx-post="/tokens/{{.ID}}/revoke"
+      hx-target="#token-list" hx-swap="innerHTML"
+      hx-confirm="Revoke this link? Whoever has it will stop receiving updates.">Revoke</button>
+  </div>
+  {{end}}
+{{else}}
+  <div class="empty">No share links yet. Create one below.</div>
+{{end}}
+{{end}}
+
+{{define "tokenListOOB"}}<div id="token-list" hx-swap-oob="innerHTML">{{template "tokenList" .}}</div>{{end}}
+
+{{define "tokenCreated"}}
+<div class="flash">
+  <p style="margin:0 0 8px">Share link for <strong>{{.Label}}</strong>. Copy it now.</p>
+  <div class="field"><label>Subscribe link (paste into a calendar app)</label>
+    <input type="text" id="share-url" readonly value="{{.WebcalURL}}" onclick="this.select()"></div>
+  <div class="field"><label>Plain HTTPS link</label>
+    <input type="text" readonly value="{{.HTTPSURL}}" onclick="this.select()"></div>
+  <button class="btn btn-secondary btn-sm" type="button"
+    onclick="navigator.clipboard.writeText(document.getElementById('share-url').value)">Copy subscribe link</button>
+</div>
+{{end}}
+
 {{define "deviceListOOB"}}<div id="device-list" hx-swap-oob="innerHTML">{{template "deviceList" .}}</div>{{end}}
 
 {{define "deviceCreated"}}

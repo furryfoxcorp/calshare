@@ -18,6 +18,7 @@
     <nav>
       <a href="/" class="{{if eq .Active "home"}}active{{end}}">Home</a>
       <a href="/calendars" class="{{if eq .Active "calendars"}}active{{end}}">Calendars</a>
+      <a href="/sources" class="{{if eq .Active "sources"}}active{{end}}">Subscriptions</a>
       <a href="/views" class="{{if eq .Active "views"}}active{{end}}">Views</a>
       <a href="/devices" class="{{if eq .Active "devices"}}active{{end}}">Devices</a>
       {{if .User.IsAdmin}}<a href="/admin" class="{{if eq .Active "admin"}}active{{end}}">Admin</a>{{end}}

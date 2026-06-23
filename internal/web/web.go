@@ -40,6 +40,9 @@ func NewServer(db *storage.DB, sessions *oidc.Manager, auth *oidc.Authenticator,
 		"dashboard":   "dashboard.html",
 		"devices":     "devices.html",
 		"calendars":   "calendars.html",
+		"views":       "views.html",
+		"view_detail": "view_detail.html",
+		"sources":     "sources.html",
 		"placeholder": "placeholder.html",
 	}
 	pages := map[string]*template.Template{}
@@ -88,7 +91,16 @@ func (s *Server) Register(mux *http.ServeMux) {
 	app.HandleFunc("GET /devices", s.handleDevices)
 	app.HandleFunc("POST /devices", s.handleCreateDevice)
 	app.HandleFunc("POST /devices/{id}/revoke", s.handleRevokeDevice)
-	app.HandleFunc("GET /views", s.placeholder("Views", "Build a filtered slice of your calendars to share."))
+	app.HandleFunc("GET /sources", s.handleSources)
+	app.HandleFunc("POST /sources", s.handleAddSource)
+	app.HandleFunc("POST /sources/{id}/poll", s.handlePollSource)
+	app.HandleFunc("GET /views", s.handleViews)
+	app.HandleFunc("POST /views", s.handleCreateView)
+	app.HandleFunc("GET /views/{id}", s.handleViewDetail)
+	app.HandleFunc("POST /views/{id}", s.handleUpdateView)
+	app.HandleFunc("POST /views/{id}/calendars", s.handleToggleViewCalendar)
+	app.HandleFunc("POST /views/{id}/tokens", s.handleCreateToken)
+	app.HandleFunc("POST /tokens/{id}/revoke", s.handleRevokeToken)
 	app.HandleFunc("GET /admin", s.placeholder("Admin", "Users, audit log, and system status."))
 
 	mux.Handle("/", s.sessions.RequireUser(app))

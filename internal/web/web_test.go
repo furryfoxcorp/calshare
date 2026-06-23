@@ -166,3 +166,80 @@ func TestRevokeDevice(t *testing.T) {
 func itoa(n int64) string {
 	return strconv.FormatInt(n, 10)
 }
+
+func TestCreateViewRedirectsToDetail(t *testing.T) {
+	h := setup(t)
+	rec := h.req(t, "POST", "/views", "name=Zoe+view&preset=busy")
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want 303", rec.Code)
+	}
+	loc := rec.Header().Get("Location")
+	if !strings.HasPrefix(loc, "/views/") {
+		t.Fatalf("redirect = %q", loc)
+	}
+	detail := h.req(t, "GET", loc, "")
+	if detail.Code != http.StatusOK {
+		t.Fatalf("detail status = %d", detail.Code)
+	}
+	if !strings.Contains(detail.Body.String(), "Zoe view") || !strings.Contains(detail.Body.String(), "Share links") {
+		t.Errorf("view detail missing expected content")
+	}
+}
+
+func TestMintShareToken(t *testing.T) {
+	h := setup(t)
+	v, _ := h.db.CreateView(context.Background(), &storage.View{UserID: h.user.ID, Name: "V", Preset: "busy"})
+	rec := h.req(t, "POST", "/views/"+itoa(v.ID)+"/tokens", "label=Zoe")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	out := rec.Body.String()
+	if !strings.Contains(out, "webcal://") || !strings.Contains(out, "/share/") {
+		t.Errorf("token reveal missing subscribe link:\n%s", out)
+	}
+	toks, _ := h.db.TokensForView(context.Background(), v.ID)
+	if len(toks) != 1 {
+		t.Fatalf("got %d tokens, want 1", len(toks))
+	}
+}
+
+func TestToggleViewCalendar(t *testing.T) {
+	h := setup(t)
+	cal, _ := h.db.CreateCalendar(context.Background(), &storage.Calendar{UserID: h.user.ID, DisplayName: "Home"})
+	v, _ := h.db.CreateView(context.Background(), &storage.View{UserID: h.user.ID, Name: "V", Preset: "busy"})
+
+	add := h.req(t, "POST", "/views/"+itoa(v.ID)+"/calendars", "calendar_id="+itoa(cal.ID))
+	if add.Code != http.StatusNoContent {
+		t.Fatalf("toggle on status = %d", add.Code)
+	}
+	vcs, _ := h.db.ViewCalendars(context.Background(), v.ID)
+	if len(vcs) != 1 {
+		t.Fatalf("calendar not added to view")
+	}
+	h.req(t, "POST", "/views/"+itoa(v.ID)+"/calendars", "calendar_id="+itoa(cal.ID))
+	vcs, _ = h.db.ViewCalendars(context.Background(), v.ID)
+	if len(vcs) != 0 {
+		t.Fatalf("calendar not removed on second toggle")
+	}
+}
+
+func TestAddSource(t *testing.T) {
+	h := setup(t)
+	rec := h.req(t, "POST", "/sources", "url=https%3A%2F%2Fexample.com%2Ffeed.ics&name=Holidays&interval=30")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "Holidays") {
+		t.Errorf("source list missing new source:\n%s", rec.Body.String())
+	}
+	cals, _ := h.db.CalendarsForUser(context.Background(), h.user.ID)
+	found := false
+	for _, c := range cals {
+		if c.SourceType == "ics" && c.ICSURL == "https://example.com/feed.ics" && c.ICSPollInterval == 1800 {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("ICS calendar not created with expected fields")
+	}
+}

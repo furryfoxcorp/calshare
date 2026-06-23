@@ -1,0 +1,36 @@
+{{define "title"}}Subscriptions - calshare{{end}}
+{{define "content"}}
+<h2>Calendar subscriptions</h2>
+<p class="sub">Follow an outside calendar by its ICS link. calshare polls it and folds the events in.</p>
+
+<section>
+  <p class="group-label">Your subscriptions</p>
+  <div class="panel" id="source-list">
+    {{template "sourceList" .Data.Sources}}
+  </div>
+</section>
+
+<section>
+  <p class="group-label">Add a subscription</p>
+  <form hx-post="/sources" hx-target="#source-list" hx-swap="innerHTML" hx-on::after-request="this.reset()">
+    <div class="field">
+      <label for="url">ICS link</label>
+      <input type="url" id="url" name="url" placeholder="https://example.com/calendar.ics" required>
+      <div class="hint">An Apple public calendar, a Google secret iCal address, an Outlook publish URL, a school timetable, and so on.</div>
+    </div>
+    <div class="field">
+      <label for="name">Name</label>
+      <input type="text" id="name" name="name" placeholder="School timetable" required>
+    </div>
+    <div class="field">
+      <label for="color">Color</label>
+      <input type="text" id="color" name="color" placeholder="#46a83c">
+    </div>
+    <div class="field">
+      <label for="interval">Check every (minutes)</label>
+      <input type="number" id="interval" name="interval" min="5" placeholder="15">
+    </div>
+    <div class="actions"><button class="btn" type="submit">Add subscription</button></div>
+  </form>
+</section>
+{{end}}

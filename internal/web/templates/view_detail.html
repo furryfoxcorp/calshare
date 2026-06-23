@@ -1,0 +1,87 @@
+{{define "title"}}{{.Data.View.Name}} - calshare{{end}}
+{{define "content"}}
+<p style="margin:0 0 6px"><a href="/views">&larr; All views</a></p>
+<h2>{{.Data.View.Name}}</h2>
+<p class="sub">Choose what this view shows and who can subscribe to it.</p>
+
+<section>
+  <p class="group-label">Settings</p>
+  <form method="post" action="/views/{{.Data.View.ID}}">
+    <div class="field">
+      <label for="name">Name</label>
+      <input type="text" id="name" name="name" value="{{.Data.View.Name}}" required>
+    </div>
+    <div class="field">
+      <label for="preset">Privacy preset</label>
+      <select id="preset" name="preset">
+        <option value="busy" {{if eq .Data.View.Preset "busy"}}selected{{end}}>Busy only</option>
+        <option value="titles" {{if eq .Data.View.Preset "titles"}}selected{{end}}>Titles</option>
+        <option value="full" {{if eq .Data.View.Preset "full"}}selected{{end}}>Full</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="busy">Busy label</label>
+      <input type="text" id="busy" name="busy_label" value="{{.Data.View.BusyLabel}}">
+      <div class="hint">Shown in place of titles when the preset is "Busy only".</div>
+    </div>
+    <div class="field">
+      <label><input type="checkbox" name="include_private" value="1" {{if .Data.View.IncludePrivate}}checked{{end}} style="width:auto;box-shadow:none"> Include private events</label>
+    </div>
+    <div class="field">
+      <label><input type="checkbox" name="include_cancelled" value="1" {{if .Data.View.IncludeCancelled}}checked{{end}} style="width:auto;box-shadow:none"> Include cancelled events</label>
+    </div>
+    <div class="field">
+      <label><input type="checkbox" name="include_tentative" value="1" {{if .Data.View.IncludeTentative}}checked{{end}} style="width:auto;box-shadow:none"> Include tentative events</label>
+    </div>
+    <div class="field">
+      <label><input type="checkbox" name="include_transparent" value="1" {{if .Data.View.IncludeTransparent}}checked{{end}} style="width:auto;box-shadow:none"> Include free/transparent events</label>
+    </div>
+    <div class="actions"><button class="btn" type="submit">Save settings</button></div>
+  </form>
+</section>
+
+<section>
+  <p class="group-label">Calendars in this view</p>
+  <div class="panel">
+    {{if .Data.Calendars}}
+      {{range .Data.Calendars}}
+      <div class="row">
+        <span class="swatch" style="background:{{if .Color}}{{.Color}}{{else}}#3f93f0{{end}}"></span>
+        <span class="grow"><span class="title">{{.DisplayName}}</span></span>
+        <label style="font-weight:normal">
+          <input type="checkbox" {{if index $.Data.Selected .ID}}checked{{end}}
+            hx-post="/views/{{$.Data.View.ID}}/calendars"
+            hx-vals='{"calendar_id":"{{.ID}}"}'
+            hx-swap="none" style="width:auto;box-shadow:none"> Include
+        </label>
+      </div>
+      {{end}}
+    {{else}}
+      <div class="empty">You have no calendars yet.</div>
+    {{end}}
+  </div>
+</section>
+
+<section>
+  <p class="group-label">Share links</p>
+  <div id="token-result"></div>
+  <div class="panel" id="token-list">
+    {{template "tokenList" .Data}}
+  </div>
+  <form hx-post="/views/{{.Data.View.ID}}/tokens" hx-target="#token-result" hx-swap="innerHTML" style="margin-top:14px">
+    <div class="field">
+      <label for="label">Who is this for</label>
+      <input type="text" id="label" name="label" placeholder="Zoe" required>
+    </div>
+    <div class="field">
+      <label for="expires">Expires (optional)</label>
+      <input type="date" id="expires" name="expires">
+    </div>
+    <div class="field">
+      <label for="password">Password (optional)</label>
+      <input type="text" id="password" name="password" placeholder="leave blank for no password">
+    </div>
+    <div class="actions"><button class="btn" type="submit">Create link</button></div>
+  </form>
+</section>
+{{end}}
