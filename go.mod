@@ -4,7 +4,9 @@ go 1.26.4
 
 require (
 	github.com/BurntSushi/toml v1.6.0
+	github.com/emersion/go-ical v0.0.0-20250609112844-439c63cef608
 	github.com/spf13/cobra v1.10.2
+	github.com/teambition/rrule-go v1.8.2
 	golang.org/x/crypto v0.53.0
 	modernc.org/sqlite v1.53.0
 )
