@@ -74,11 +74,11 @@ func (b *Backend) toCalDAV(email string, c *storage.Calendar) caldav.Calendar {
 	}
 }
 
-// resolveCalendar finds the calendar named by a parsed path and checks the
-// authenticated user may reach it. ACL-based sharing is added later; for now a
-// user reaches only their own calendars.
+// resolveCalendar finds the calendar named by a parsed path and confirms the
+// authenticated user may read it (as owner or via an ACL grant). Write
+// enforcement is done separately by requireWrite.
 func (b *Backend) resolveCalendar(ctx context.Context, p parsed) (*storage.User, *storage.Calendar, error) {
-	authed, err := authedUser(ctx)
+	_, cal, _, err := b.access(ctx, p)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -86,14 +86,46 @@ func (b *Backend) resolveCalendar(ctx context.Context, p parsed) (*storage.User,
 	if err != nil {
 		return nil, nil, webdav.NewHTTPError(http.StatusNotFound, err)
 	}
-	if owner.ID != authed.ID {
-		return nil, nil, webdav.NewHTTPError(http.StatusForbidden, errors.New("not your calendar"))
+	return owner, cal, nil
+}
+
+// access resolves the calendar and the authenticated user's access level,
+// returning 404 when the calendar is missing and 403 when the user has no
+// access at all.
+func (b *Backend) access(ctx context.Context, p parsed) (*storage.User, *storage.Calendar, string, error) {
+	authed, err := authedUser(ctx)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	owner, err := b.db.UserByEmail(ctx, p.email)
+	if err != nil {
+		return nil, nil, "", webdav.NewHTTPError(http.StatusNotFound, err)
 	}
 	cal, err := b.db.CalendarBySlug(ctx, owner.ID, p.slug)
 	if err != nil {
-		return nil, nil, webdav.NewHTTPError(http.StatusNotFound, err)
+		return nil, nil, "", webdav.NewHTTPError(http.StatusNotFound, err)
 	}
-	return owner, cal, nil
+	level, err := b.db.AccessLevel(ctx, cal.ID, authed.ID)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	if level == storage.AccessNone {
+		return nil, nil, "", webdav.NewHTTPError(http.StatusForbidden, errors.New("no access to this calendar"))
+	}
+	return authed, cal, level, nil
+}
+
+// requireWrite resolves a calendar and rejects the request unless the user can
+// write to it.
+func (b *Backend) requireWrite(ctx context.Context, p parsed) (*storage.User, *storage.Calendar, error) {
+	authed, cal, level, err := b.access(ctx, p)
+	if err != nil {
+		return nil, nil, err
+	}
+	if level != storage.AccessOwner && level != storage.AccessReadWrite {
+		return nil, nil, webdav.NewHTTPError(http.StatusForbidden, errors.New("read-only access"))
+	}
+	return authed, cal, nil
 }
 
 // CreateCalendar handles MKCALENDAR.
@@ -229,7 +261,7 @@ func (b *Backend) QueryCalendarObjects(ctx context.Context, path string, query *
 // PutCalendarObject stores an object, honoring If-Match and If-None-Match.
 func (b *Backend) PutCalendarObject(ctx context.Context, path string, cal *goical.Calendar, opts *caldav.PutCalendarObjectOptions) (*caldav.CalendarObject, error) {
 	p := b.parsePath(path)
-	owner, calRow, err := b.resolveCalendar(ctx, p)
+	_, calRow, err := b.requireWrite(ctx, p)
 	if err != nil {
 		return nil, err
 	}
@@ -279,7 +311,7 @@ func (b *Backend) PutCalendarObject(ctx context.Context, path string, cal *goica
 	}
 
 	return &caldav.CalendarObject{
-		Path:          b.objectPath(owner.Email, calRow.Slug, obj.Href),
+		Path:          b.objectPath(p.email, calRow.Slug, obj.Href),
 		ModTime:       obj.ModifiedAt,
 		ContentLength: obj.SizeBytes,
 		ETag:          obj.ETag,
@@ -289,7 +321,7 @@ func (b *Backend) PutCalendarObject(ctx context.Context, path string, cal *goica
 // DeleteCalendarObject removes one object.
 func (b *Backend) DeleteCalendarObject(ctx context.Context, path string) error {
 	p := b.parsePath(path)
-	_, cal, err := b.resolveCalendar(ctx, p)
+	_, cal, err := b.requireWrite(ctx, p)
 	if err != nil {
 		return err
 	}

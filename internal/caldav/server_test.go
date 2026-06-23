@@ -186,3 +186,49 @@ func TestOptionsAdvertisesCalendarAccess(t *testing.T) {
 		t.Errorf("OPTIONS DAV header = %q, want calendar-access", dav)
 	}
 }
+
+func TestSharedCalendarReadVsWrite(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	// A second user with their own app password.
+	grantee, _ := f.db.UpsertUserOnLogin(ctx, "g", "zoe@example.com", "Zoe")
+	const granteePass = "zoe-device-000000"
+	f.db.CreateAppPassword(ctx, grantee.ID, "Zoe Mac", granteePass)
+
+	ownerObj := "/dav/" + testEmail + "/calendars/" + f.cal.Slug + "/shared.ics"
+	f.do(t, "PUT", ownerObj, eventICS("shared"), map[string]string{"Content-Type": "text/calendar"})
+
+	asGrantee := func(method, path, body string) *http.Response {
+		var r io.Reader
+		if body != "" {
+			r = strings.NewReader(body)
+		}
+		req := httptest.NewRequest(method, path, r)
+		req.SetBasicAuth("zoe@example.com", granteePass)
+		req.Header.Set("Content-Type", "text/calendar")
+		w := httptest.NewRecorder()
+		f.srv.Handler().ServeHTTP(w, req)
+		return w.Result()
+	}
+
+	// No grant yet: forbidden.
+	if res := asGrantee("GET", ownerObj, ""); res.StatusCode != http.StatusForbidden {
+		t.Fatalf("ungranted GET = %d, want 403", res.StatusCode)
+	}
+
+	// Read grant: GET works, PUT is rejected.
+	f.db.GrantCalendarAccess(ctx, f.cal.ID, grantee.ID, storage.AccessRead)
+	if res := asGrantee("GET", ownerObj, ""); res.StatusCode != http.StatusOK {
+		t.Fatalf("read GET = %d, want 200", res.StatusCode)
+	}
+	wObj := "/dav/" + testEmail + "/calendars/" + f.cal.Slug + "/byzoe.ics"
+	if res := asGrantee("PUT", wObj, eventICS("byzoe")); res.StatusCode != http.StatusForbidden {
+		t.Fatalf("read-only PUT = %d, want 403", res.StatusCode)
+	}
+
+	// Read-write grant: PUT works.
+	f.db.GrantCalendarAccess(ctx, f.cal.ID, grantee.ID, storage.AccessReadWrite)
+	if res := asGrantee("PUT", wObj, eventICS("byzoe")); res.StatusCode != http.StatusCreated && res.StatusCode != http.StatusNoContent {
+		t.Fatalf("read-write PUT = %d, want 201/204", res.StatusCode)
+	}
+}
