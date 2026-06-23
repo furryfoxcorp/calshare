@@ -190,3 +190,38 @@ func TestPollSendsBasicAuth(t *testing.T) {
 		t.Errorf("basic auth = %q:%q, want feeduser:feedpass", gotUser, gotPass)
 	}
 }
+
+func TestBackoffGrowsWithFailures(t *testing.T) {
+	p := New(nil, 15*time.Minute, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	base := 15 * time.Minute
+	cases := []struct {
+		fails int
+		want  time.Duration
+	}{
+		{0, base},
+		{1, 2 * base},
+		{2, 4 * base},
+		{10, maxBackoff}, // capped
+	}
+	for _, c := range cases {
+		got := p.interval(&storage.Calendar{ICSPollInterval: 900, ICSFailCount: c.fails})
+		if got != c.want {
+			t.Errorf("failCount %d: interval = %v, want %v", c.fails, got, c.want)
+		}
+	}
+}
+
+func TestDueRespectsBackoff(t *testing.T) {
+	p := New(nil, 15*time.Minute, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	now := time.Now().UTC()
+	last := now.Add(-30 * time.Minute)
+	// With one failure, backoff is 30m, so a 30m-old poll is exactly due.
+	cal := &storage.Calendar{ICSURL: "x", ICSPollInterval: 900, ICSFailCount: 1, ICSLastPolledAt: &last}
+	if !p.due(cal, now) {
+		t.Error("should be due after backoff elapsed")
+	}
+	cal.ICSFailCount = 5 // backoff far longer than 30m
+	if p.due(cal, now) {
+		t.Error("should not be due while backing off")
+	}
+}

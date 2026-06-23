@@ -33,6 +33,7 @@ type Calendar struct {
 	ICSLastError    string
 	ICSBasicUser    string
 	ICSBasicPassEnc []byte
+	ICSFailCount    int
 }
 
 // NewSlug returns a stable, URL-safe identifier for a calendar collection.
@@ -83,7 +84,7 @@ func (db *DB) CreateCalendar(ctx context.Context, c *Calendar) (*Calendar, error
 const calCols = `id, user_id, slug, source_type, display_name, color, description,
 	ctag, sync_seq, supports_vtodo, created_at, ics_url, ics_poll_interval,
 	ics_etag, ics_last_modified, ics_last_polled_at, ics_last_status,
-	ics_last_error, ics_basic_user, ics_basic_pass_enc`
+	ics_last_error, ics_basic_user, ics_basic_pass_enc, ics_fail_count`
 
 func scanCalendar(row interface{ Scan(...any) error }) (*Calendar, error) {
 	var c Calendar
@@ -94,7 +95,7 @@ func scanCalendar(row interface{ Scan(...any) error }) (*Calendar, error) {
 	err := row.Scan(&c.ID, &c.UserID, &c.Slug, &c.SourceType, &c.DisplayName,
 		&color, &desc, &c.Ctag, &c.SyncSeq, &supportsVTODO, &created,
 		&icsURL, &pollInterval, &icsETag, &icsLastMod, &icsPolled, &icsStatus,
-		&icsErr, &icsUser, &c.ICSBasicPassEnc)
+		&icsErr, &icsUser, &c.ICSBasicPassEnc, &c.ICSFailCount)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, ErrNotFound
@@ -181,11 +182,11 @@ func (db *DB) ICSCalendars(ctx context.Context) ([]Calendar, error) {
 // UpdateICSPollState records the outcome of a poll: the new validators, a
 // status word, and an error string (empty on success). It always stamps
 // ics_last_polled_at.
-func (db *DB) UpdateICSPollState(ctx context.Context, calID int64, etag, lastModified, status, errStr string) error {
+func (db *DB) UpdateICSPollState(ctx context.Context, calID int64, etag, lastModified, status, errStr string, failCount int) error {
 	_, err := db.ExecContext(ctx, `
 		UPDATE calendars SET ics_etag = ?, ics_last_modified = ?, ics_last_polled_at = ?,
-			ics_last_status = ?, ics_last_error = ? WHERE id = ?`,
-		nullString(etag), nullString(lastModified), nowUTC(), status, nullString(errStr), calID)
+			ics_last_status = ?, ics_last_error = ?, ics_fail_count = ? WHERE id = ?`,
+		nullString(etag), nullString(lastModified), nowUTC(), status, nullString(errStr), failCount, calID)
 	return err
 }
 

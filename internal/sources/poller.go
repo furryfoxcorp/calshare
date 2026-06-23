@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math/rand"
 	"net/http"
 	"strings"
 	"time"
@@ -43,8 +44,14 @@ func New(db *storage.DB, defaultInterval time.Duration, dataKey []byte, logger *
 	}
 }
 
-// Run sweeps due feeds every minute until ctx is cancelled.
+// Run sweeps due feeds every minute until ctx is cancelled. It waits a short
+// random moment first so a fleet of feeds does not all fire at startup.
 func (p *Poller) Run(ctx context.Context) {
+	select {
+	case <-ctx.Done():
+		return
+	case <-time.After(startupJitter()):
+	}
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
 	p.sweep(ctx)
@@ -76,6 +83,9 @@ func (p *Poller) sweep(ctx context.Context) {
 	}
 }
 
+// maxBackoff caps the failure backoff interval.
+const maxBackoff = 24 * time.Hour
+
 func (p *Poller) due(c *storage.Calendar, now time.Time) bool {
 	if c.ICSURL == "" {
 		return false
@@ -83,11 +93,28 @@ func (p *Poller) due(c *storage.Calendar, now time.Time) bool {
 	if c.ICSLastPolledAt == nil {
 		return true
 	}
-	interval := p.defaultInterval
+	return now.Sub(*c.ICSLastPolledAt) >= p.interval(c)
+}
+
+// interval returns the effective wait before the next poll: the base interval,
+// stretched by exponential backoff after consecutive failures.
+func (p *Poller) interval(c *storage.Calendar) time.Duration {
+	base := p.defaultInterval
 	if c.ICSPollInterval > 0 {
-		interval = time.Duration(c.ICSPollInterval) * time.Second
+		base = time.Duration(c.ICSPollInterval) * time.Second
 	}
-	return now.Sub(*c.ICSLastPolledAt) >= interval
+	if c.ICSFailCount <= 0 {
+		return base
+	}
+	shift := c.ICSFailCount
+	if shift > 20 {
+		shift = 20 // avoid overflow; already far past maxBackoff
+	}
+	backoff := base << uint(shift)
+	if backoff <= 0 || backoff > maxBackoff {
+		return maxBackoff
+	}
+	return backoff
 }
 
 // PollOnce fetches one feed and syncs it. It records poll state regardless of
@@ -115,29 +142,29 @@ func (p *Poller) PollOnce(ctx context.Context, c *storage.Calendar) error {
 
 	resp, err := p.client.Do(req)
 	if err != nil {
-		_ = p.db.UpdateICSPollState(ctx, c.ID, c.ICSETag, c.ICSLastModified, "unreachable", err.Error())
+		_ = p.db.UpdateICSPollState(ctx, c.ID, c.ICSETag, c.ICSLastModified, "unreachable", err.Error(), c.ICSFailCount+1)
 		return err
 	}
 	defer resp.Body.Close()
 
 	switch {
 	case resp.StatusCode == http.StatusNotModified:
-		return p.db.UpdateICSPollState(ctx, c.ID, c.ICSETag, c.ICSLastModified, "not_modified", "")
+		return p.db.UpdateICSPollState(ctx, c.ID, c.ICSETag, c.ICSLastModified, "not_modified", "", 0)
 	case resp.StatusCode >= 400:
-		_ = p.db.UpdateICSPollState(ctx, c.ID, c.ICSETag, c.ICSLastModified, "http_error", resp.Status)
+		_ = p.db.UpdateICSPollState(ctx, c.ID, c.ICSETag, c.ICSLastModified, "http_error", resp.Status, c.ICSFailCount+1)
 		return fmt.Errorf("feed returned %s", resp.Status)
 	}
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 25<<20))
 	if err != nil {
-		_ = p.db.UpdateICSPollState(ctx, c.ID, c.ICSETag, c.ICSLastModified, "unreachable", err.Error())
+		_ = p.db.UpdateICSPollState(ctx, c.ID, c.ICSETag, c.ICSLastModified, "unreachable", err.Error(), c.ICSFailCount+1)
 		return err
 	}
 	if err := p.sync(ctx, c, body); err != nil {
-		_ = p.db.UpdateICSPollState(ctx, c.ID, c.ICSETag, c.ICSLastModified, "parse_error", err.Error())
+		_ = p.db.UpdateICSPollState(ctx, c.ID, c.ICSETag, c.ICSLastModified, "parse_error", err.Error(), c.ICSFailCount+1)
 		return err
 	}
-	return p.db.UpdateICSPollState(ctx, c.ID, resp.Header.Get("ETag"), resp.Header.Get("Last-Modified"), "ok", "")
+	return p.db.UpdateICSPollState(ctx, c.ID, resp.Header.Get("ETag"), resp.Header.Get("Last-Modified"), "ok", "", 0)
 }
 
 // sync diffs the feed's events against stored objects: upsert each VEVENT UID,
@@ -196,6 +223,12 @@ func (p *Poller) sync(ctx context.Context, c *storage.Calendar, body []byte) err
 		}
 	}
 	return nil
+}
+
+// startupJitter returns a small random delay (0 to 30 seconds) so a server
+// with many feeds staggers its first sweep.
+func startupJitter() time.Duration {
+	return time.Duration(rand.Int63n(int64(30 * time.Second)))
 }
 
 func sanitizeHref(uid string) string {
