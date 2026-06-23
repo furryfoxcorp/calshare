@@ -191,6 +191,13 @@ func (p *Poller) sync(ctx context.Context, c *storage.Calendar, body []byte) err
 		byUID[uid] = append(byUID[uid], child)
 	}
 
+	// A feed that parses to zero events is treated as suspicious (a transient
+	// empty-but-200 response): import nothing and, crucially, delete nothing,
+	// so a glitch upstream cannot wipe the mirrored calendar.
+	if len(byUID) == 0 {
+		return nil
+	}
+
 	seen := map[string]bool{}
 	for uid, comps := range byUID {
 		href := sanitizeHref(uid) + ".ics"

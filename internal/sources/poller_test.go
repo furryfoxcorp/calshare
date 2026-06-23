@@ -240,3 +240,26 @@ func TestNormalizeFeedURL(t *testing.T) {
 	}
 }
 
+
+func TestEmptyFeedDoesNotDeleteEvents(t *testing.T) {
+	feed := feedV1
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, feed)
+	}))
+	defer srv.Close()
+	db, cal := newPollerDB(t, srv.URL)
+	p := New(db, 15*time.Minute, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
+
+	if err := p.PollOnce(context.Background(), cal); err != nil {
+		t.Fatal(err)
+	}
+	// Feed transiently returns a valid but empty calendar.
+	feed = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//x//EN\r\nEND:VCALENDAR\r\n"
+	if err := p.PollOnce(context.Background(), cal); err != nil {
+		t.Fatal(err)
+	}
+	objs, _ := db.ListObjects(context.Background(), cal.ID)
+	if len(objs) != 2 {
+		t.Fatalf("empty feed wiped events: got %d, want 2 preserved", len(objs))
+	}
+}

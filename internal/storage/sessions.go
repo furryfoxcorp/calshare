@@ -122,8 +122,10 @@ func (db *DB) TakeOIDCFlow(ctx context.Context, state string) (*OIDCFlow, error)
 	var f OIDCFlow
 	var redirect sql.NullString
 	var expires string
+	// DELETE ... RETURNING makes the take atomic: a state can be consumed only
+	// once, so a replayed callback cannot reuse it.
 	err := db.QueryRowContext(ctx,
-		"SELECT state, code_verifier, nonce, redirect_to, expires_at FROM oidc_flows WHERE state = ?", state).
+		"DELETE FROM oidc_flows WHERE state = ? RETURNING state, code_verifier, nonce, redirect_to, expires_at", state).
 		Scan(&f.State, &f.CodeVerifier, &f.Nonce, &redirect, &expires)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -131,7 +133,6 @@ func (db *DB) TakeOIDCFlow(ctx context.Context, state string) (*OIDCFlow, error)
 		}
 		return nil, err
 	}
-	_, _ = db.ExecContext(ctx, "DELETE FROM oidc_flows WHERE state = ?", state)
 	f.RedirectTo = redirect.String
 	if time.Now().UTC().After(parseTime(expires)) {
 		return nil, ErrNotFound
