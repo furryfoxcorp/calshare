@@ -15,6 +15,7 @@ type Server struct {
 	db         *storage.DB
 	prefix     string
 	trustProxy bool
+	backend    *Backend
 	handler    *caldav.Handler
 }
 
@@ -23,12 +24,14 @@ type Server struct {
 // IP logging. sched may be nil to disable auto-schedule.
 func NewServer(db *storage.DB, prefix string, trustProxy bool, sched *scheduling.Scheduler) *Server {
 	prefix = "/" + strings.Trim(prefix, "/")
+	b := NewBackend(db, prefix, sched)
 	return &Server{
 		db:         db,
 		prefix:     prefix,
 		trustProxy: trustProxy,
+		backend:    b,
 		handler: &caldav.Handler{
-			Backend: NewBackend(db, prefix, sched),
+			Backend: b,
 			Prefix:  prefix,
 		},
 	}
@@ -37,7 +40,7 @@ func NewServer(db *storage.DB, prefix string, trustProxy bool, sched *scheduling
 // Handler returns the authenticated CalDAV http.Handler. Mount it for both the
 // prefix subtree and /.well-known/caldav.
 func (s *Server) Handler() http.Handler {
-	return s.basicAuth(s.handler)
+	return s.basicAuth(s.intercept(s.handler))
 }
 
 // Register attaches the CalDAV routes to a mux.

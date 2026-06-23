@@ -232,3 +232,67 @@ func TestSharedCalendarReadVsWrite(t *testing.T) {
 		t.Fatalf("read-write PUT = %d, want 201/204", res.StatusCode)
 	}
 }
+
+func TestFreeBusyQuery(t *testing.T) {
+	f := newFixture(t)
+	objPath := "/dav/" + testEmail + "/calendars/" + f.cal.Slug + "/fb.ics"
+	f.do(t, "PUT", objPath, eventICS("fb"), map[string]string{"Content-Type": "text/calendar"})
+
+	report := `<?xml version="1.0"?>
+<C:free-busy-query xmlns:C="urn:ietf:params:xml:ns:caldav">
+  <C:time-range start="20260101T000000Z" end="20260201T000000Z"/>
+</C:free-busy-query>`
+	res := f.do(t, "REPORT", "/dav/"+testEmail+"/calendars/"+f.cal.Slug+"/", report, map[string]string{"Content-Type": "application/xml"})
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d", res.StatusCode)
+	}
+	got := body(t, res)
+	if !strings.Contains(got, "BEGIN:VFREEBUSY") {
+		t.Errorf("no VFREEBUSY:\n%s", got)
+	}
+	if !strings.Contains(got, "FREEBUSY;FBTYPE=BUSY:20260105T090000Z/20260105T100000Z") {
+		t.Errorf("expected busy period missing:\n%s", got)
+	}
+}
+
+func TestPrincipalPropertySearch(t *testing.T) {
+	f := newFixture(t)
+	report := `<?xml version="1.0"?>
+<D:principal-property-search xmlns:D="DAV:">
+  <D:property-search><D:prop><D:displayname/></D:prop><D:match>Owner</D:match></D:property-search>
+  <D:prop><D:displayname/></D:prop>
+</D:principal-property-search>`
+	res := f.do(t, "REPORT", "/dav/", report, map[string]string{"Content-Type": "application/xml"})
+	if res.StatusCode != http.StatusMultiStatus {
+		t.Fatalf("status = %d, want 207", res.StatusCode)
+	}
+	got := body(t, res)
+	if !strings.Contains(got, "/dav/"+testEmail+"/") {
+		t.Errorf("principal href missing:\n%s", got)
+	}
+	if !strings.Contains(got, "mailto:"+testEmail) {
+		t.Errorf("calendar-user-address-set missing:\n%s", got)
+	}
+}
+
+func TestPrincipalPropfindHasSchedulingProps(t *testing.T) {
+	f := newFixture(t)
+	pf := `<?xml version="1.0"?><d:propfind xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav"><d:prop><c:calendar-home-set/><c:schedule-inbox-URL/><c:calendar-user-address-set/></d:prop></d:propfind>`
+	res := f.do(t, "PROPFIND", "/dav/"+testEmail+"/", pf, map[string]string{"Depth": "0", "Content-Type": "application/xml"})
+	if res.StatusCode != http.StatusMultiStatus {
+		t.Fatalf("status = %d, want 207", res.StatusCode)
+	}
+	got := body(t, res)
+	for _, want := range []string{
+		"calendar-home-set",
+		"/dav/" + testEmail + "/calendars/",
+		"schedule-inbox-URL",
+		"schedule-outbox-URL",
+		"mailto:" + testEmail,
+		"INDIVIDUAL",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("principal propfind missing %q:\n%s", want, got)
+		}
+	}
+}

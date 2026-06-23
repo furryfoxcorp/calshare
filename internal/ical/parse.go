@@ -157,6 +157,58 @@ func isBounded(rrule string) bool {
 	return strings.Contains(up, "COUNT=") || strings.Contains(up, "UNTIL=")
 }
 
+// master returns the master (non-RECURRENCE-ID) component, or the first.
+func (o *Object) master() *goical.Component {
+	comps := timedComponents(o.Cal)
+	for _, c := range comps {
+		if c.Props.Get("RECURRENCE-ID") == nil {
+			return c
+		}
+	}
+	if len(comps) > 0 {
+		return comps[0]
+	}
+	return nil
+}
+
+// Duration returns the master component's span (end minus start), or zero.
+func (o *Object) Duration() time.Duration {
+	m := o.master()
+	if m == nil {
+		return 0
+	}
+	s, ok := startOf(m)
+	if !ok {
+		return 0
+	}
+	return durationOf(m, s)
+}
+
+// Transparent reports whether the event does not block time (TRANSP:TRANSPARENT).
+func (o *Object) Transparent() bool {
+	m := o.master()
+	return m != nil && textProp(m, "TRANSP") == "TRANSPARENT"
+}
+
+// Private reports whether the event is marked private or confidential.
+func (o *Object) Private() bool {
+	m := o.master()
+	if m == nil {
+		return false
+	}
+	switch textProp(m, "CLASS") {
+	case "PRIVATE", "CONFIDENTIAL":
+		return true
+	}
+	return false
+}
+
+// Cancelled reports whether the event status is CANCELLED.
+func (o *Object) Cancelled() bool {
+	m := o.master()
+	return m != nil && textProp(m, "STATUS") == "CANCELLED"
+}
+
 // Occurrences returns the start instants of the object within window,
 // expanding any RRULE on the master component. Single instances return their
 // start when it falls in the window.

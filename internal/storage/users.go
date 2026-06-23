@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -83,6 +84,33 @@ func (db *DB) UserByID(ctx context.Context, id int64) (*User, error) {
 func (db *DB) UserByEmail(ctx context.Context, email string) (*User, error) {
 	row := db.QueryRowContext(ctx, "SELECT "+userCols+" FROM users WHERE LOWER(email) = LOWER(?)", email)
 	return scanUser(row)
+}
+
+// SearchUsers finds users whose email or display name contains q
+// (case-insensitive). An empty query returns all users.
+func (db *DB) SearchUsers(ctx context.Context, q string) ([]User, error) {
+	like := "%" + strings.ToLower(q) + "%"
+	rows, err := db.QueryContext(ctx,
+		"SELECT "+userCols+" FROM users WHERE LOWER(email) LIKE ? OR LOWER(display_name) LIKE ? ORDER BY display_name",
+		like, like)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []User
+	for rows.Next() {
+		u, err := scanUser(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, *u)
+	}
+	return out, rows.Err()
+}
+
+// AllUsers returns every user, for the admin page.
+func (db *DB) AllUsers(ctx context.Context) ([]User, error) {
+	return db.SearchUsers(ctx, "")
 }
 
 // SetAdmin sets or clears the admin flag on the user matched by email.
