@@ -1,10 +1,10 @@
 name: Release
 
-# Build cross-platform release archives with giftwrap when a version tag is
-# pushed (for example v0.1.0), and attach them to a GitHub Release. giftwrap
-# reads the version from the tag, so the checkout needs full history/tags.
-# giftwrap runs relative to .github/giftwrap.yml, so its output lands in
-# .github/_dist.
+# On a version tag (for example v0.1.0): build cross-platform binary archives
+# with giftwrap and attach them to a GitHub Release, and build and push a
+# multi-arch container image to GHCR. giftwrap reads the version from the tag,
+# so the checkout needs full history; it runs relative to .github/giftwrap.yml,
+# so its output lands in .github/_dist.
 on:
   push:
     tags:
@@ -12,9 +12,10 @@ on:
 
 permissions:
   contents: write
+  packages: write
 
 jobs:
-  release:
+  archives:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -31,3 +32,36 @@ jobs:
         with:
           files: .github/_dist/*
           generate_release_notes: true
+
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=raw,value=latest
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: VERSION=${{ steps.meta.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
