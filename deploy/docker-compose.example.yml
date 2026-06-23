@@ -13,7 +13,7 @@ services:
       - calshare-data:/data
     environment:
       # The public URL nginx serves. Required.
-      CALDAV_EXTERNAL_URL: "https://vulpes.calshare.fyi"
+      CALDAV_EXTERNAL_URL: "https://calendar.example.com"
 
       # OIDC single sign-on for the web UI. Required.
       CALDAV_OIDC_ISSUER: "https://your-sso.example/realms/main"

@@ -87,7 +87,7 @@ precedence.
 | Variable | Default | Meaning |
 |----------|---------|---------|
 | `CALDAV_LISTEN_ADDR` | `:8080` | Address the server listens on |
-| `CALDAV_EXTERNAL_URL` | required | Public URL, e.g. `https://vulpes.calshare.fyi` |
+| `CALDAV_EXTERNAL_URL` | required | Public URL, e.g. `https://calendar.example.com` |
 | `CALDAV_DB_PATH` | `/var/lib/caldav-share/db.sqlite` | SQLite file path |
 | `CALDAV_SESSION_KEY` | generated | Signs session cookies; persisted if unset |
 | `CALDAV_DATA_KEY` | generated | Encrypts stored feed credentials; persisted if unset |

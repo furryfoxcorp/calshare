@@ -37,7 +37,7 @@ func setup(t *testing.T) *harness {
 	key := []byte("0123456789abcdef0123456789abcdef")
 	sessions := oidc.NewManager(db, key, false)
 
-	srv := NewServer(db, sessions, nil, nil, nil, nil, "https://vulpes.calshare.fyi")
+	srv := NewServer(db, sessions, nil, nil, nil, nil, "https://calendar.example.com")
 	mux := http.NewServeMux()
 	srv.Register(mux)
 
