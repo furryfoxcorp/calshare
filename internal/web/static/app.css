@@ -1,0 +1,274 @@
+/* calshare web UI. Styled after Mac OS X Lion (10.7): stitched leather,
+   linen, brushed metal, and glossy Aqua. Light only; Lion was a light OS. */
+
+:root {
+  --linen: #d9d4cb;
+  --linen-dark: #c7c1b6;
+  --paper: #f6f4ef;
+  --paper-edge: #e7e3da;
+  --ink: #34302a;
+  --ink-soft: #6b655c;
+  --hair: #b9b3a8;
+  --leather: #5a4632;
+  --leather-dark: #3d2e1f;
+  --leather-light: #6d5640;
+  --stitch: #cdb796;
+  --aqua-top: #a9d2ff;
+  --aqua-mid: #3f93f0;
+  --aqua-bot: #1f6fd6;
+  --aqua-edge: #155bb5;
+  --metal-top: #fefefe;
+  --metal-bot: #c8c8c8;
+  --metal-edge: #9a9a9a;
+  --danger-top: #f0a07a;
+  --danger-mid: #e0673a;
+  --danger-bot: #c44e22;
+  --radius: 5px;
+  --shadow-sheet: 0 18px 40px rgba(0,0,0,0.35);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  font-family: "Lucida Grande", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 13px;
+  color: var(--ink);
+  /* Linen: warm gray base with a faint woven noise. */
+  background-color: var(--linen);
+  background-image:
+    linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px),
+    radial-gradient(circle at 50% 0%, rgba(255,255,255,0.25), rgba(0,0,0,0.06));
+  background-size: 3px 3px, 3px 3px, 100% 100%;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--aqua-edge); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* App shell: a centered window with a leather header. */
+.window {
+  max-width: 940px;
+  margin: 26px auto 60px;
+  background: var(--paper);
+  border: 1px solid #8f8a80;
+  border-radius: 8px;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.6) inset, 0 12px 30px rgba(0,0,0,0.28);
+  overflow: hidden;
+}
+
+/* Stitched leather header, the iCal signature. */
+.leather {
+  position: relative;
+  padding: 14px 20px 16px;
+  color: #f4ece0;
+  background:
+    linear-gradient(rgba(255,255,255,0.06), rgba(0,0,0,0.18)),
+    radial-gradient(circle at 30% -20%, var(--leather-light), var(--leather) 55%, var(--leather-dark));
+  border-bottom: 3px solid var(--leather-dark);
+  text-shadow: 0 -1px 0 rgba(0,0,0,0.6);
+}
+.leather::after {
+  /* Dashed stitching just inside the edge. */
+  content: "";
+  position: absolute;
+  inset: 7px 9px;
+  border: 1px dashed var(--stitch);
+  border-radius: 5px;
+  opacity: 0.55;
+  pointer-events: none;
+}
+.leather h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+}
+.leather .tagline {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: #d9c7af;
+  text-shadow: 0 -1px 0 rgba(0,0,0,0.5);
+}
+
+/* Torn-paper edge under the toolbar. */
+.torn {
+  height: 8px;
+  background:
+    radial-gradient(circle at 6px -3px, transparent 5px, var(--paper) 5px) repeat-x;
+  background-size: 12px 8px;
+  border-top: 1px solid rgba(0,0,0,0.12);
+}
+
+/* Brushed-metal toolbar / nav. */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 7px 14px;
+  background: linear-gradient(var(--metal-top), var(--metal-bot));
+  border-bottom: 1px solid var(--metal-edge);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.7) inset;
+}
+.toolbar .spacer { flex: 1; }
+.toolbar nav a {
+  display: inline-block;
+  padding: 4px 11px;
+  margin-right: 2px;
+  color: #2c2c2c;
+  border-radius: var(--radius);
+  text-shadow: 0 1px 0 rgba(255,255,255,0.7);
+}
+.toolbar nav a:hover { text-decoration: none; background: rgba(0,0,0,0.06); }
+.toolbar nav a.active {
+  background: linear-gradient(#6f6f6f, #5a5a5a);
+  color: #fff;
+  text-shadow: 0 -1px 0 rgba(0,0,0,0.5);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.3) inset;
+}
+.toolbar .who { color: #444; font-size: 12px; text-shadow: 0 1px 0 rgba(255,255,255,0.6); }
+
+.content { padding: 22px 24px 28px; }
+
+h2 {
+  margin: 0 0 4px;
+  font-size: 17px;
+  font-weight: 700;
+  color: #2b2b2b;
+  text-shadow: 0 1px 0 rgba(255,255,255,0.8);
+}
+h2 + .sub { margin: 0 0 18px; color: var(--ink-soft); }
+section { margin-bottom: 30px; }
+
+/* Letterpress section label, like a Lion preference group. */
+.group-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #8a8478;
+  text-shadow: 0 1px 0 rgba(255,255,255,0.9);
+  margin: 0 0 8px;
+}
+
+/* Recessed list panel. */
+.panel {
+  background: #fff;
+  border: 1px solid var(--hair);
+  border-radius: var(--radius);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.8), 0 1px 3px rgba(0,0,0,0.07) inset;
+  overflow: hidden;
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #ececec;
+}
+.row:last-child { border-bottom: none; }
+.row:nth-child(even) { background: #fafaf8; }
+.row .grow { flex: 1; min-width: 0; }
+.row .title { font-weight: 600; }
+.row .meta { color: var(--ink-soft); font-size: 12px; }
+.swatch { width: 13px; height: 13px; border-radius: 3px; border: 1px solid rgba(0,0,0,0.25); box-shadow: 0 1px 0 rgba(255,255,255,0.5) inset; }
+
+.empty {
+  padding: 18px;
+  color: var(--ink-soft);
+  font-style: italic;
+}
+
+/* Glossy Aqua buttons. */
+.btn {
+  display: inline-block;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: #f7fbff;
+  padding: 5px 14px;
+  border: 1px solid var(--aqua-edge);
+  border-radius: var(--radius);
+  background: linear-gradient(var(--aqua-top), var(--aqua-mid) 48%, var(--aqua-bot));
+  box-shadow: 0 1px 0 rgba(255,255,255,0.55) inset, 0 1px 1px rgba(0,0,0,0.18);
+  text-shadow: 0 -1px 0 rgba(0,0,0,0.35);
+  cursor: pointer;
+}
+.btn:hover { filter: brightness(1.05); text-decoration: none; }
+.btn:active { background: linear-gradient(var(--aqua-bot), var(--aqua-mid)); box-shadow: 0 1px 3px rgba(0,0,0,0.35) inset; }
+
+.btn-secondary {
+  color: #333;
+  border-color: #9a9a9a;
+  background: linear-gradient(#ffffff, #dcdcdc);
+  text-shadow: 0 1px 0 rgba(255,255,255,0.8);
+}
+.btn-secondary:active { background: linear-gradient(#cfcfcf, #e6e6e6); }
+
+.btn-danger {
+  border-color: var(--danger-bot);
+  background: linear-gradient(var(--danger-top), var(--danger-mid) 48%, var(--danger-bot));
+}
+
+.btn-sm { padding: 3px 9px; font-size: 11px; }
+
+/* Forms: recessed inputs. */
+.field { margin-bottom: 12px; }
+.field label { display: block; font-weight: 600; margin-bottom: 4px; color: #3a3a3a; }
+input[type=text], input[type=url], input[type=password], input[type=number], input[type=date], select, textarea {
+  font: inherit;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid #b4b0a6;
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.12) inset;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--aqua-mid);
+  box-shadow: 0 0 0 3px rgba(63,147,240,0.35), 0 1px 2px rgba(0,0,0,0.12) inset;
+}
+.field .hint { font-size: 11px; color: var(--ink-soft); margin-top: 3px; }
+.actions { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
+
+/* A monospace credential, shown once. */
+.credential {
+  font-family: Menlo, Monaco, monospace;
+  font-size: 15px;
+  letter-spacing: 1px;
+  background: #fffbe6;
+  border: 1px solid #d8cf96;
+  border-radius: 4px;
+  padding: 8px 10px;
+  display: inline-block;
+}
+
+/* Login is a small centered sheet on bare linen. */
+.login-wrap { display: flex; min-height: 100%; align-items: center; justify-content: center; }
+.login-card {
+  width: 340px;
+  background: var(--paper);
+  border: 1px solid #8f8a80;
+  border-radius: 9px;
+  box-shadow: var(--shadow-sheet);
+  overflow: hidden;
+  text-align: center;
+}
+.login-card .leather { padding: 18px; }
+.login-card .body { padding: 26px 26px 28px; }
+.login-card .body p { color: var(--ink-soft); margin: 0 0 18px; }
+
+.flash {
+  padding: 9px 12px;
+  border-radius: 4px;
+  margin-bottom: 16px;
+  border: 1px solid #cdb86f;
+  background: #fdf6da;
+  color: #6a5a1e;
+}

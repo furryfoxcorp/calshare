@@ -1,0 +1,47 @@
+{{define "deviceList"}}
+{{if .}}
+  {{range .}}
+  <div class="row">
+    <span class="grow"><span class="title">{{.Label}}</span>
+      <div class="meta">Added {{date .CreatedAt}}{{if .LastUsedAt}} &middot; last used {{date .LastUsedAt}}{{else}} &middot; not used yet{{end}}</div>
+    </span>
+    <button class="btn btn-danger btn-sm"
+      hx-post="/devices/{{.ID}}/revoke"
+      hx-target="#device-list" hx-swap="innerHTML"
+      hx-confirm="Revoke this app password? The device using it will stop syncing.">Revoke</button>
+  </div>
+  {{end}}
+{{else}}
+  <div class="empty">No app passwords yet. Generate one above to connect a device.</div>
+{{end}}
+{{end}}
+
+{{define "deviceListOOB"}}<div id="device-list" hx-swap-oob="innerHTML">{{template "deviceList" .}}</div>{{end}}
+
+{{define "deviceCreated"}}
+<div class="flash">
+  <p style="margin:0 0 8px">New password for <strong>{{.Label}}</strong>. Copy it now; it will not be shown again.</p>
+  <span class="credential" id="new-cred">{{.Password}}</span>
+  <button class="btn btn-secondary btn-sm" type="button" style="margin-left:8px"
+    onclick="navigator.clipboard.writeText(document.getElementById('new-cred').textContent)">Copy</button>
+</div>
+{{end}}
+
+{{define "calendarList"}}
+{{if .}}
+  {{range .}}
+  <div class="row">
+    <span class="swatch" style="background:{{if .Color}}{{.Color}}{{else}}#3f93f0{{end}}"></span>
+    <span class="grow"><span class="title">{{.DisplayName}}</span>
+      <div class="meta">{{if eq .SourceType "ics"}}Subscribed feed{{else}}Local calendar{{end}}{{if .SupportsVTODO}} &middot; tasks on{{end}}</div>
+    </span>
+    <button class="btn btn-danger btn-sm"
+      hx-post="/calendars/{{.ID}}/delete"
+      hx-target="#calendar-list" hx-swap="innerHTML"
+      hx-confirm="Delete this calendar and everything in it?">Delete</button>
+  </div>
+  {{end}}
+{{else}}
+  <div class="empty">No calendars yet. Add one below.</div>
+{{end}}
+{{end}}

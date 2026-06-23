@@ -1,0 +1,48 @@
+{{define "title"}}calshare{{end}}
+{{define "content"}}
+<h2>Home</h2>
+<p class="sub">A quick look at your calendars, devices, and shared views.</p>
+
+<section>
+  <p class="group-label">Your calendars</p>
+  {{if .Data.Calendars}}
+  <div class="panel">
+    {{range .Data.Calendars}}
+    <div class="row">
+      <span class="swatch" style="background:{{if .Color}}{{.Color}}{{else}}#3f93f0{{end}}"></span>
+      <span class="grow"><span class="title">{{.DisplayName}}</span>
+        <div class="meta">{{if eq .SourceType "ics"}}Subscribed feed{{else}}Local calendar{{end}}</div>
+      </span>
+      <a class="btn btn-secondary btn-sm" href="/calendars">Open</a>
+    </div>
+    {{end}}
+  </div>
+  {{else}}
+  <div class="panel"><div class="empty">No calendars yet. Add one from the Calendars page.</div></div>
+  {{end}}
+</section>
+
+<section>
+  <p class="group-label">Devices</p>
+  <div class="panel">
+    <div class="row">
+      <span class="grow"><span class="title">{{.Data.DeviceCount}} app password{{if ne .Data.DeviceCount 1}}s{{end}}</span>
+        <div class="meta">App passwords let Apple Calendar, Thunderbird, and DAVx5 connect.</div>
+      </span>
+      <a class="btn btn-sm" href="/devices">Manage</a>
+    </div>
+  </div>
+</section>
+
+<section>
+  <p class="group-label">Shared views</p>
+  <div class="panel">
+    <div class="row">
+      <span class="grow"><span class="title">{{.Data.ViewCount}} view{{if ne .Data.ViewCount 1}}s{{end}}</span>
+        <div class="meta">Publish a filtered slice of your calendar as a subscribe link.</div>
+      </span>
+      <a class="btn btn-sm" href="/views">Manage</a>
+    </div>
+  </div>
+</section>
+{{end}}

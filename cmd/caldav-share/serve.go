@@ -2,16 +2,20 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/furryfoxcorp/calshare/internal/caldav"
+	"github.com/furryfoxcorp/calshare/internal/oidc"
 	"github.com/furryfoxcorp/calshare/internal/storage"
+	"github.com/furryfoxcorp/calshare/internal/web"
 	"github.com/spf13/cobra"
 )
 
@@ -58,8 +62,31 @@ func runServe(cmd *cobra.Command) error {
 		}
 	}
 
+	sessionKey, err := db.SessionKey(cmd.Context(), deriveKey(cfg.SessionKey))
+	if err != nil {
+		return err
+	}
+	secure := strings.HasPrefix(cfg.ExternalURL, "https://")
+	sessions := oidc.NewManager(db, sessionKey, secure)
+
+	var auth *oidc.Authenticator
+	a, authErr := oidc.New(cmd.Context(), db, sessions, oidc.Config{
+		Issuer:       cfg.OIDCIssuer,
+		ClientID:     cfg.OIDCClientID,
+		ClientSecret: cfg.OIDCClientSecret,
+		RedirectURL:  cfg.OIDCRedirectURL,
+		Scopes:       strings.Fields(cfg.OIDCScopes),
+		AdminEmails:  cfg.AdminEmailSet(),
+	})
+	if authErr != nil {
+		logger.Warn("OIDC provider unavailable; web sign-in disabled until reachable", "err", authErr)
+	} else {
+		auth = a
+	}
+
 	mux := http.NewServeMux()
 	caldav.NewServer(db, "/dav", cfg.TrustProxyHeaders).Register(mux)
+	web.NewServer(db, sessions, auth, cfg.ExternalURL).Register(mux)
 
 	srv := &http.Server{
 		Addr:              cfg.ListenAddr,
@@ -88,6 +115,16 @@ func runServe(cmd *cobra.Command) error {
 		defer cancel()
 		return srv.Shutdown(shutdownCtx)
 	}
+}
+
+// deriveKey turns a configured key string into a stable 32-byte key, or nil
+// when unset so storage generates and persists one.
+func deriveKey(s string) []byte {
+	if s == "" {
+		return nil
+	}
+	sum := sha256.Sum256([]byte(s))
+	return sum[:]
 }
 
 func newLogger(level string) *slog.Logger {

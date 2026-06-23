@@ -1,0 +1,38 @@
+{{define "title"}}Calendars - calshare{{end}}
+{{define "content"}}
+<h2>Calendars</h2>
+<p class="sub">Local calendars you write to from your devices, plus feeds you subscribe to.</p>
+
+<section>
+  <p class="group-label">Your calendars</p>
+  <div class="panel" id="calendar-list">
+    {{template "calendarList" .Data.Calendars}}
+  </div>
+</section>
+
+<section>
+  <p class="group-label">New local calendar</p>
+  <form hx-post="/calendars" hx-target="#calendar-list" hx-swap="innerHTML" hx-on::after-request="this.reset()">
+    <div class="field">
+      <label for="name">Name</label>
+      <input type="text" id="name" name="name" placeholder="Home" required>
+    </div>
+    <div class="field">
+      <label for="color">Color</label>
+      <input type="text" id="color" name="color" placeholder="#3f93f0">
+      <div class="hint">A hex color like #d24b3a. Optional.</div>
+    </div>
+    <div class="field">
+      <label><input type="checkbox" name="tasks" value="1" checked style="width:auto;box-shadow:none"> Allow tasks (VTODO) on this calendar</label>
+    </div>
+    <div class="actions"><button class="btn" type="submit">Add calendar</button></div>
+  </form>
+</section>
+
+<section>
+  <p class="group-label">Connect a device</p>
+  <div class="panel"><div class="row"><span class="grow">
+    Point your client at <strong>{{.Data.DAVBase}}</strong> and sign in with your email and an app password.
+  </span><a class="btn btn-secondary btn-sm" href="/devices">Get a password</a></div></div>
+</section>
+{{end}}

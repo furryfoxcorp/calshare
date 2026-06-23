@@ -1,0 +1,25 @@
+{{define "title"}}Devices - calshare{{end}}
+{{define "content"}}
+<h2>Devices</h2>
+<p class="sub">App passwords for connecting calendar clients. Your CalDAV username is <strong>{{.User.Email}}</strong>.</p>
+
+<section>
+  <p class="group-label">Add an app password</p>
+  <form hx-post="/devices" hx-target="#device-result" hx-swap="innerHTML">
+    <div class="field">
+      <label for="label">Device name</label>
+      <input type="text" id="label" name="label" placeholder="Zoe's iPhone" required>
+      <div class="hint">A name to recognize this device later. You can revoke it any time.</div>
+    </div>
+    <div class="actions"><button class="btn" type="submit">Generate password</button></div>
+  </form>
+  <div id="device-result"></div>
+</section>
+
+<section>
+  <p class="group-label">Existing passwords</p>
+  <div class="panel" id="device-list">
+    {{template "deviceList" .Data.Devices}}
+  </div>
+</section>
+{{end}}

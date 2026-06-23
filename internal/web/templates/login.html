@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in to calshare</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-card">
+    <header class="leather">
+      <h1>calshare</h1>
+      <p class="tagline">your calendars, shared on your terms</p>
+    </header>
+    <div class="torn"></div>
+    <div class="body">
+      {{if .Error}}<div class="flash">{{.Error}}</div>{{end}}
+      <p>Sign in with your account to manage calendars, devices, and shared views.</p>
+      <a class="btn" href="/oidc/login">Sign in with SSO</a>
+    </div>
+  </div>
+</div>
+</body>
+</html>
