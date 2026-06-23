@@ -1,0 +1,19 @@
+# Internal planning, never published
+.spec/
+.plan/
+docs/
+
+# Build output
+/caldav-share
+/dist/
+*.exe
+
+# Local database and runtime state
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.db
+
+# Editor and OS cruft
+.DS_Store
+*.swp
