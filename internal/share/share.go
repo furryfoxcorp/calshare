@@ -42,9 +42,18 @@ func NewServer(db *storage.DB) *Server {
 	}
 }
 
-// Register attaches the share route.
+// Register attaches the share route. GET and HEAD serve the calendar; any
+// other method (notably the PROPFIND that calendar apps send when probing for
+// CalDAV) gets a clean 405 so clients stop probing and just subscribe to the
+// ICS feed instead of following a redirect into the web login.
 func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /share/{file}", s.handle)
+	mux.HandleFunc("/share/{file}", s.handleMethodNotAllowed)
+}
+
+func (s *Server) handleMethodNotAllowed(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Allow", "GET, HEAD")
+	http.Error(w, "this is an ICS subscription link; use GET", http.StatusMethodNotAllowed)
 }
 
 func (s *Server) handle(w http.ResponseWriter, r *http.Request) {

@@ -172,3 +172,19 @@ func TestShareEmptyViewServesValidCalendar(t *testing.T) {
 		t.Errorf("not a valid empty calendar:\n%s", out)
 	}
 }
+
+func TestSharePropfindIsMethodNotAllowed(t *testing.T) {
+	s := newSetup(t, "")
+	mux := http.NewServeMux()
+	s.srv.Register(mux)
+	req := httptest.NewRequest("PROPFIND", "/share/"+s.secret+".ics", nil)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	res := w.Result()
+	if res.StatusCode != http.StatusMethodNotAllowed {
+		t.Fatalf("PROPFIND status = %d, want 405 (not a redirect)", res.StatusCode)
+	}
+	if res.Header.Get("Allow") == "" {
+		t.Error("missing Allow header")
+	}
+}
