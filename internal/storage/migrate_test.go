@@ -34,23 +34,23 @@ func TestMigrateAppliesAndIsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first Migrate: %v", err)
 	}
-	if n != 1 {
-		t.Fatalf("first Migrate applied %d, want 1", n)
+	if n < 1 {
+		t.Fatalf("first Migrate applied %d, want at least 1", n)
 	}
 	v, err := db.SchemaVersion(ctx)
 	if err != nil {
 		t.Fatalf("SchemaVersion: %v", err)
 	}
-	if v != 1 {
-		t.Fatalf("SchemaVersion = %d, want 1", v)
+	if v != n {
+		t.Fatalf("SchemaVersion = %d, want %d (one per applied migration)", v, n)
 	}
 
-	n, err = db.Migrate(ctx)
+	n2, err := db.Migrate(ctx)
 	if err != nil {
 		t.Fatalf("second Migrate: %v", err)
 	}
-	if n != 0 {
-		t.Fatalf("second Migrate applied %d, want 0", n)
+	if n2 != 0 {
+		t.Fatalf("second Migrate applied %d, want 0", n2)
 	}
 }
 

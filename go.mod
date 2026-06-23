@@ -4,16 +4,19 @@ go 1.26.4
 
 require (
 	github.com/BurntSushi/toml v1.6.0
+	github.com/coreos/go-oidc/v3 v3.19.0
 	github.com/emersion/go-ical v0.0.0-20250609112844-439c63cef608
 	github.com/emersion/go-webdav v0.7.0
 	github.com/spf13/cobra v1.10.2
 	github.com/teambition/rrule-go v1.8.2
 	golang.org/x/crypto v0.53.0
+	golang.org/x/oauth2 v0.36.0
 	modernc.org/sqlite v1.53.0
 )
 
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
