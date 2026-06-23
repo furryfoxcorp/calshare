@@ -318,3 +318,28 @@ func TestAdminAccess(t *testing.T) {
 		t.Fatalf("admin (as admin) status = %d, want 200", w.Code)
 	}
 }
+
+func TestRevokeTokenReflectedInList(t *testing.T) {
+	h := setup(t)
+	ctx := context.Background()
+	v, _ := h.db.CreateView(ctx, &storage.View{UserID: h.user.ID, Name: "V", Preset: "busy"})
+	secret, _ := storage.NewShareTokenSecret()
+	id, _ := h.db.CreateShareToken(ctx, v.ID, "Zoe", secret, "", nil)
+
+	rec := h.req(t, "POST", "/tokens/"+itoa(id)+"/revoke", "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	out := rec.Body.String()
+	if !strings.Contains(out, "Revoked") {
+		t.Errorf("revoked token not marked in list:\n%s", out)
+	}
+	// The revoke button for that token should be gone.
+	if strings.Contains(out, "/tokens/"+itoa(id)+"/revoke") {
+		t.Error("revoke button still present for a revoked token")
+	}
+	tok, _ := h.db.TokensForView(ctx, v.ID)
+	if tok[0].RevokedAt == nil {
+		t.Error("token not revoked in DB")
+	}
+}
