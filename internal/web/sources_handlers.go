@@ -60,6 +60,7 @@ func (s *Server) handleAddSource(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "could not add subscription", http.StatusInternalServerError)
 		return
 	}
+	s.audited(r, "source.add", "calendar", cal.ID, map[string]any{"url": url})
 	// Fetch once immediately so the list shows real status.
 	go func(c storage.Calendar) {
 		poller := sources.New(s.db, 15*time.Minute, slog.Default())

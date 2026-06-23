@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/furryfoxcorp/calshare/internal/audit"
 	"github.com/furryfoxcorp/calshare/internal/caldav"
 	"github.com/furryfoxcorp/calshare/internal/imip"
 	"github.com/furryfoxcorp/calshare/internal/oidc"
@@ -96,7 +97,7 @@ func runServe(cmd *cobra.Command) error {
 	mux := http.NewServeMux()
 	caldav.NewServer(db, "/dav", cfg.TrustProxyHeaders, sched).Register(mux)
 	share.NewServer(db).Register(mux)
-	web.NewServer(db, sessions, auth, cfg.ExternalURL).Register(mux)
+	web.NewServer(db, sessions, auth, audit.New(db, logger), cfg.ExternalURL).Register(mux)
 
 	srv := &http.Server{
 		Addr:              cfg.ListenAddr,

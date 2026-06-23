@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/furryfoxcorp/calshare/internal/audit"
 	"github.com/furryfoxcorp/calshare/internal/oidc"
 	"github.com/furryfoxcorp/calshare/internal/storage"
 )
@@ -25,6 +26,7 @@ type Server struct {
 	db          *storage.DB
 	sessions    *oidc.Manager
 	auth        *oidc.Authenticator // may be nil if OIDC is not yet reachable
+	audit       *audit.Logger
 	externalURL string
 	pages       map[string]*template.Template
 	login       *template.Template
@@ -32,8 +34,8 @@ type Server struct {
 }
 
 // NewServer builds the web server. auth may be nil; when nil the login page
-// explains that SSO is unavailable.
-func NewServer(db *storage.DB, sessions *oidc.Manager, auth *oidc.Authenticator, externalURL string) *Server {
+// explains that SSO is unavailable. audit may be nil to skip audit logging.
+func NewServer(db *storage.DB, sessions *oidc.Manager, auth *oidc.Authenticator, audlog *audit.Logger, externalURL string) *Server {
 	funcs := template.FuncMap{"date": fmtDate}
 
 	pageFiles := map[string]string{
@@ -56,6 +58,7 @@ func NewServer(db *storage.DB, sessions *oidc.Manager, auth *oidc.Authenticator,
 		db:          db,
 		sessions:    sessions,
 		auth:        auth,
+		audit:       audlog,
 		externalURL: externalURL,
 		pages:       pages,
 		login:       template.Must(template.New("").Funcs(funcs).ParseFS(tmplFS, "templates/login.html")),
@@ -116,6 +119,58 @@ func (s *Server) render(w http.ResponseWriter, name string, p page) {
 	if err := t.ExecuteTemplate(w, "layout", p); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+// audited records an audit event for the current request, resolving the actor
+// from the session.
+func (s *Server) audited(r *http.Request, event, targetKind string, targetID int64, meta map[string]any) {
+	var actor *int64
+	kind := "anonymous"
+	if u, ok := oidc.UserFromContext(r.Context()); ok {
+		actor = &u.ID
+		kind = "user"
+		if u.IsAdmin {
+			kind = "admin"
+		}
+	}
+	var tid *int64
+	if targetID != 0 {
+		tid = &targetID
+	}
+	s.audit.Record(r.Context(), audit.Entry{
+		ActorUserID: actor, ActorKind: kind, Event: event,
+		TargetKind: targetKind, TargetID: tid, ClientIP: webClientIP(r), Metadata: meta,
+	})
+}
+
+func webClientIP(r *http.Request) string {
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		if i := indexByteWeb(xff, ','); i >= 0 {
+			return trimSpaceWeb(xff[:i])
+		}
+		return trimSpaceWeb(xff)
+	}
+	return r.RemoteAddr
+}
+
+func indexByteWeb(s string, b byte) int {
+	for i := 0; i < len(s); i++ {
+		if s[i] == b {
+			return i
+		}
+	}
+	return -1
+}
+
+func trimSpaceWeb(s string) string {
+	i, j := 0, len(s)
+	for i < j && s[i] == ' ' {
+		i++
+	}
+	for j > i && s[j-1] == ' ' {
+		j--
+	}
+	return s[i:j]
 }
 
 func cacheControl(next http.Handler) http.Handler {

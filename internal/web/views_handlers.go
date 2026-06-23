@@ -162,10 +162,12 @@ func (s *Server) handleCreateToken(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "could not generate link", http.StatusInternalServerError)
 		return
 	}
-	if _, err := s.db.CreateShareToken(r.Context(), v.ID, label, secret, r.FormValue("password"), expires); err != nil {
+	tokenID, err := s.db.CreateShareToken(r.Context(), v.ID, label, secret, r.FormValue("password"), expires)
+	if err != nil {
 		http.Error(w, "could not save link", http.StatusInternalServerError)
 		return
 	}
+	s.audited(r, "share_token.create", "view", v.ID, map[string]any{"label": label, "token_id": tokenID})
 
 	base := strings.TrimRight(s.externalURL, "/") + "/share/" + secret + ".ics"
 	webcal := base
@@ -196,6 +198,7 @@ func (s *Server) handleRevokeToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = s.db.RevokeShareToken(r.Context(), tok.ID)
+	s.audited(r, "share_token.revoke", "view", view.ID, map[string]any{"token_id": tok.ID})
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = s.partials.ExecuteTemplate(w, "tokenList", s.viewDetailData(r, view))
 }

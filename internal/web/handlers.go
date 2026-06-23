@@ -97,7 +97,7 @@ func (s *Server) handleCreateCalendar(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "name is required", http.StatusBadRequest)
 		return
 	}
-	_, err := s.db.CreateCalendar(r.Context(), &storage.Calendar{
+	cal, err := s.db.CreateCalendar(r.Context(), &storage.Calendar{
 		UserID:        user.ID,
 		SourceType:    "native",
 		DisplayName:   name,
@@ -108,6 +108,7 @@ func (s *Server) handleCreateCalendar(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "could not create calendar", http.StatusInternalServerError)
 		return
 	}
+	s.audited(r, "calendar.create", "calendar", cal.ID, map[string]any{"name": name})
 	s.writeCalendarList(w, r, user.ID)
 }
 
@@ -125,6 +126,11 @@ func (s *Server) handleDeleteCalendar(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := s.db.DeleteCalendar(r.Context(), id); err != nil {
 		http.Error(w, "could not delete", http.StatusInternalServerError)
+		return
+	}
+	s.audited(r, "calendar.delete", "calendar", id, nil)
+	if cal.SourceType == "ics" {
+		s.writeSourceList(w, r, user.ID)
 		return
 	}
 	s.writeCalendarList(w, r, user.ID)
@@ -158,10 +164,12 @@ func (s *Server) handleCreateDevice(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "could not generate password", http.StatusInternalServerError)
 		return
 	}
-	if _, err := s.db.CreateAppPassword(r.Context(), user.ID, label, pw); err != nil {
+	id, err := s.db.CreateAppPassword(r.Context(), user.ID, label, pw)
+	if err != nil {
 		http.Error(w, "could not save password", http.StatusInternalServerError)
 		return
 	}
+	s.audited(r, "app_password.create", "app_password", id, map[string]any{"label": label})
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = s.partials.ExecuteTemplate(w, "deviceCreated", struct{ Label, Password string }{label, pw})
 	// Out-of-band refresh of the list below.
@@ -185,6 +193,7 @@ func (s *Server) handleRevokeDevice(w http.ResponseWriter, r *http.Request) {
 	}
 	if owned {
 		_ = s.db.RevokeAppPassword(r.Context(), id)
+		s.audited(r, "app_password.revoke", "app_password", id, nil)
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = s.partials.ExecuteTemplate(w, "deviceList", s.activeDevices(r, user.ID))
