@@ -343,3 +343,30 @@ func TestRevokeTokenReflectedInList(t *testing.T) {
 		t.Error("token not revoked in DB")
 	}
 }
+
+func TestUpdateViewFields(t *testing.T) {
+	h := setup(t)
+	ctx := context.Background()
+	// Full preset shows everything but strips alerts by default.
+	v, _ := h.db.CreateView(ctx, &storage.View{UserID: h.user.ID, Name: "V", Preset: "full"})
+
+	// Override: re-enable VALARM (show alerts) and hide LOCATION.
+	form := "field_VALARM=keep&field_LOCATION=strip"
+	// Include the other fields at their full-preset defaults so they aren't recorded as deltas.
+	rec := h.req(t, "POST", "/views/"+itoa(v.ID)+"/fields", form)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	updated, _ := h.db.ViewByID(ctx, v.ID)
+	if !strings.Contains(updated.FieldsJSON, "VALARM") || !strings.Contains(updated.FieldsJSON, "keep") {
+		t.Errorf("VALARM override not saved: %s", updated.FieldsJSON)
+	}
+	if !strings.Contains(updated.FieldsJSON, "LOCATION") {
+		t.Errorf("LOCATION override not saved: %s", updated.FieldsJSON)
+	}
+	// The detail page should reflect the overrides.
+	detail := h.req(t, "GET", "/views/"+itoa(v.ID), "")
+	if !strings.Contains(detail.Body.String(), "Field details") {
+		t.Error("field editor not rendered")
+	}
+}

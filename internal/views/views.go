@@ -31,6 +31,13 @@ var managedFields = []string{
 	"STATUS", "TRANSP", "VALARM", "CREATED", "LAST-MODIFIED", "DTSTAMP", "SEQUENCE",
 }
 
+// OrderedFields returns the managed property names in display order.
+func OrderedFields() []string {
+	out := make([]string, len(managedFields))
+	copy(out, managedFields)
+	return out
+}
+
 // PresetRules returns the default field rules for a preset, per the design's
 // field configuration table. VALARM is always stripped by default.
 func PresetRules(p Preset) map[string]Rule {

@@ -1,6 +1,7 @@
 package web
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/furryfoxcorp/calshare/internal/oidc"
 	"github.com/furryfoxcorp/calshare/internal/storage"
+	"github.com/furryfoxcorp/calshare/internal/views"
 )
 
 // handleGenPassword returns a fresh random password inside a replacement input
@@ -79,6 +81,61 @@ type viewDetailData struct {
 	Calendars []storage.Calendar
 	Selected  map[int64]bool
 	Tokens    []storage.ShareToken
+	Fields    []fieldRow
+}
+
+// fieldRow is one managed property and its effective rule for the editor.
+type fieldRow struct {
+	Name       string
+	Rule       string // keep, strip, or replace
+	CanReplace bool   // only SUMMARY supports replace
+	Label      string
+}
+
+// fieldLabels gives friendlier names for the field editor.
+var fieldLabels = map[string]string{
+	"SUMMARY": "Title", "DESCRIPTION": "Description/notes", "LOCATION": "Location",
+	"URL": "URL", "ATTENDEE": "Attendees", "ORGANIZER": "Organizer",
+	"CATEGORIES": "Categories", "GEO": "Map coordinates", "ATTACH": "Attachments",
+	"COMMENT": "Comments", "RESOURCES": "Resources", "PRIORITY": "Priority",
+	"CLASS": "Privacy class", "STATUS": "Status", "TRANSP": "Free/busy flag",
+	"VALARM": "Alerts and notifications", "CREATED": "Created date",
+	"LAST-MODIFIED": "Last modified", "DTSTAMP": "Timestamp", "SEQUENCE": "Revision",
+}
+
+func parseFieldsJSON(s string) map[string]views.Rule {
+	out := map[string]views.Rule{}
+	if s == "" {
+		return out
+	}
+	var raw map[string]string
+	if err := json.Unmarshal([]byte(s), &raw); err != nil {
+		return out
+	}
+	for k, v := range raw {
+		out[k] = views.Rule(v)
+	}
+	return out
+}
+
+// effectiveFieldRows computes the current rule for each managed field from the
+// view's preset plus its stored overrides.
+func effectiveFieldRows(v *storage.View) []fieldRow {
+	preset := views.PresetRules(views.Preset(v.Preset))
+	overrides := parseFieldsJSON(v.FieldsJSON)
+	var rows []fieldRow
+	for _, name := range views.OrderedFields() {
+		rule := preset[name]
+		if o, ok := overrides[name]; ok {
+			rule = o
+		}
+		label := fieldLabels[name]
+		if label == "" {
+			label = name
+		}
+		rows = append(rows, fieldRow{Name: name, Rule: string(rule), CanReplace: name == "SUMMARY", Label: label})
+	}
+	return rows
 }
 
 func (s *Server) viewDetailData(r *http.Request, v *storage.View) viewDetailData {
@@ -96,7 +153,7 @@ func (s *Server) viewDetailData(r *http.Request, v *storage.View) viewDetailData
 			tokens = append(tokens, t)
 		}
 	}
-	return viewDetailData{View: v, Calendars: cals, Selected: selected, Tokens: tokens}
+	return viewDetailData{View: v, Calendars: cals, Selected: selected, Tokens: tokens, Fields: effectiveFieldRows(v)}
 }
 
 func (s *Server) handleViewDetail(w http.ResponseWriter, r *http.Request) {
@@ -123,6 +180,48 @@ func (s *Server) handleUpdateView(w http.ResponseWriter, r *http.Request) {
 	v.IncludeCancelled = r.FormValue("include_cancelled") == "1"
 	v.IncludeTentative = r.FormValue("include_tentative") == "1"
 	v.IncludeTransparent = r.FormValue("include_transparent") == "1"
+	if err := s.db.UpdateView(r.Context(), v); err != nil {
+		http.Error(w, "could not save", http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, "/views/"+strconv.FormatInt(v.ID, 10), http.StatusSeeOther)
+}
+
+// handleUpdateFields saves per-field rule overrides. Only deltas from the
+// preset are stored, so changing the preset later still moves the untouched
+// fields.
+func (s *Server) handleUpdateFields(w http.ResponseWriter, r *http.Request) {
+	v, ok := s.loadOwnedView(w, r)
+	if !ok {
+		return
+	}
+	preset := views.PresetRules(views.Preset(v.Preset))
+	overrides := map[string]string{}
+	for _, name := range views.OrderedFields() {
+		choice := r.FormValue("field_" + name)
+		var rule views.Rule
+		switch choice {
+		case string(views.Keep), string(views.Strip):
+			rule = views.Rule(choice)
+		case string(views.Replace):
+			if name == "SUMMARY" {
+				rule = views.Replace
+			} else {
+				rule = views.Keep
+			}
+		default:
+			continue // unknown value, leave at preset default
+		}
+		if rule != preset[name] {
+			overrides[name] = string(rule)
+		}
+	}
+	blob, err := json.Marshal(overrides)
+	if err != nil {
+		http.Error(w, "could not save", http.StatusInternalServerError)
+		return
+	}
+	v.FieldsJSON = string(blob)
 	if err := s.db.UpdateView(r.Context(), v); err != nil {
 		http.Error(w, "could not save", http.StatusInternalServerError)
 		return

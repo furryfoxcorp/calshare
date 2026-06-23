@@ -41,6 +41,26 @@
 </section>
 
 <section>
+  <p class="group-label">Field details</p>
+  <p class="sub" style="margin-top:0">The preset sets these; change any field to fine-tune. Alerts and notifications are stripped by default.</p>
+  <form method="post" action="/views/{{.Data.View.ID}}/fields">
+    <div class="panel">
+      {{range .Data.Fields}}
+      <div class="row">
+        <span class="grow"><span class="title">{{.Label}}</span><div class="meta">{{.Name}}</div></span>
+        <select name="field_{{.Name}}" style="width:auto">
+          <option value="keep" {{if eq .Rule "keep"}}selected{{end}}>Show</option>
+          <option value="strip" {{if eq .Rule "strip"}}selected{{end}}>Hide</option>
+          {{if .CanReplace}}<option value="replace" {{if eq .Rule "replace"}}selected{{end}}>Replace with label</option>{{end}}
+        </select>
+      </div>
+      {{end}}
+    </div>
+    <div class="actions" style="margin-top:10px"><button class="btn" type="submit">Save fields</button></div>
+  </form>
+</section>
+
+<section>
   <p class="group-label">Calendars in this view</p>
   <div class="panel">
     {{if .Data.Calendars}}

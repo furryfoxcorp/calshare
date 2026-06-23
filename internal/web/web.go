@@ -130,6 +130,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	app.HandleFunc("POST /views", s.handleCreateView)
 	app.HandleFunc("GET /views/{id}", s.handleViewDetail)
 	app.HandleFunc("POST /views/{id}", s.handleUpdateView)
+	app.HandleFunc("POST /views/{id}/fields", s.handleUpdateFields)
 	app.HandleFunc("POST /views/{id}/calendars", s.handleToggleViewCalendar)
 	app.HandleFunc("POST /views/{id}/tokens", s.handleCreateToken)
 	app.HandleFunc("POST /tokens/{id}/revoke", s.handleRevokeToken)
