@@ -14,6 +14,8 @@ import (
 
 	"github.com/furryfoxcorp/calshare/internal/caldav"
 	"github.com/furryfoxcorp/calshare/internal/oidc"
+	"github.com/furryfoxcorp/calshare/internal/share"
+	"github.com/furryfoxcorp/calshare/internal/sources"
 	"github.com/furryfoxcorp/calshare/internal/storage"
 	"github.com/furryfoxcorp/calshare/internal/web"
 	"github.com/spf13/cobra"
@@ -86,6 +88,7 @@ func runServe(cmd *cobra.Command) error {
 
 	mux := http.NewServeMux()
 	caldav.NewServer(db, "/dav", cfg.TrustProxyHeaders).Register(mux)
+	share.NewServer(db).Register(mux)
 	web.NewServer(db, sessions, auth, cfg.ExternalURL).Register(mux)
 
 	srv := &http.Server{
@@ -96,6 +99,9 @@ func runServe(cmd *cobra.Command) error {
 
 	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	// Poll external ICS feeds in the background.
+	go sources.New(db, cfg.ICSDefaultPollInterval, logger).Run(ctx)
 
 	errCh := make(chan error, 1)
 	go func() {

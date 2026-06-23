@@ -160,6 +160,35 @@ func (db *DB) DeleteCalendar(ctx context.Context, id int64) error {
 	return err
 }
 
+// ICSCalendars lists every calendar backed by an ICS feed.
+func (db *DB) ICSCalendars(ctx context.Context) ([]Calendar, error) {
+	rows, err := db.QueryContext(ctx, "SELECT "+calCols+" FROM calendars WHERE source_type = 'ics' ORDER BY id")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Calendar
+	for rows.Next() {
+		c, err := scanCalendar(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, *c)
+	}
+	return out, rows.Err()
+}
+
+// UpdateICSPollState records the outcome of a poll: the new validators, a
+// status word, and an error string (empty on success). It always stamps
+// ics_last_polled_at.
+func (db *DB) UpdateICSPollState(ctx context.Context, calID int64, etag, lastModified, status, errStr string) error {
+	_, err := db.ExecContext(ctx, `
+		UPDATE calendars SET ics_etag = ?, ics_last_modified = ?, ics_last_polled_at = ?,
+			ics_last_status = ?, ics_last_error = ? WHERE id = ?`,
+		nullString(etag), nullString(lastModified), nowUTC(), status, nullString(errStr), calID)
+	return err
+}
+
 // bumpSync increments a calendar's sync sequence inside tx and returns the new
 // sequence and the ctag derived from it.
 func bumpSync(ctx context.Context, tx *sql.Tx, calID int64) (int64, string, error) {
