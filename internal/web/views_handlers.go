@@ -291,7 +291,9 @@ func (s *Server) handleCreateToken(w http.ResponseWriter, r *http.Request) {
 	}
 	s.audited(r, "share_token.create", "view", v.ID, map[string]any{"label": label, "token_id": tokenID})
 
-	base := strings.TrimRight(s.externalURL, "/") + "/share/" + secret + ".ics"
+	// Include a readable name segment so calendar apps that name a subscription
+	// from the URL show the view name rather than the opaque token.
+	base := strings.TrimRight(s.externalURL, "/") + "/share/" + secret + "/" + linkNameSlug(v.Name) + ".ics"
 	webcal := base
 	if strings.HasPrefix(webcal, "https://") {
 		webcal = "webcal://" + strings.TrimPrefix(webcal, "https://")
@@ -304,6 +306,24 @@ func (s *Server) handleCreateToken(w http.ResponseWriter, r *http.Request) {
 		Label, WebcalURL, HTTPSURL string
 	}{label, webcal, base})
 	_ = s.partials.ExecuteTemplate(w, "tokenListOOB", s.viewDetailData(r, v))
+}
+
+// linkNameSlug turns a view name into a readable, URL-safe filename segment.
+func linkNameSlug(name string) string {
+	var b strings.Builder
+	for _, r := range name {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
+			b.WriteRune(r)
+		case r == ' ' || r == '-' || r == '_':
+			b.WriteByte('-')
+		}
+	}
+	s := strings.Trim(b.String(), "-")
+	if s == "" {
+		return "calendar"
+	}
+	return s
 }
 
 func (s *Server) handleRevokeToken(w http.ResponseWriter, r *http.Request) {

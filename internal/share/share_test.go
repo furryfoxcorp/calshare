@@ -188,3 +188,21 @@ func TestSharePropfindIsMethodNotAllowed(t *testing.T) {
 		t.Error("missing Allow header")
 	}
 }
+
+func TestShareNamedURLResolves(t *testing.T) {
+	s := newSetup(t, "")
+	// /share/<token>/<name>.ics must resolve the same as /share/<token>.ics.
+	res := s.get(t, "/share/"+s.secret+"/Zoe-View.ics", false, "")
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("named share URL status = %d, want 200", res.StatusCode)
+	}
+	// PROPFIND on the named form also gets 405, not a redirect.
+	mux := http.NewServeMux()
+	s.srv.Register(mux)
+	req := httptest.NewRequest("PROPFIND", "/share/"+s.secret+"/Zoe-View.ics", nil)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	if w.Result().StatusCode != http.StatusMethodNotAllowed {
+		t.Fatalf("named PROPFIND status = %d, want 405", w.Result().StatusCode)
+	}
+}

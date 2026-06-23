@@ -47,8 +47,13 @@ func NewServer(db *storage.DB) *Server {
 // CalDAV) gets a clean 405 so clients stop probing and just subscribe to the
 // ICS feed instead of following a redirect into the web login.
 func (s *Server) Register(mux *http.ServeMux) {
+	// Two shapes: /share/<token>.ics and /share/<token>/<name>.ics. The second
+	// carries a cosmetic name segment so calendar apps that name a subscription
+	// after the URL filename show the view name instead of the opaque token.
 	mux.HandleFunc("GET /share/{file}", s.handle)
 	mux.HandleFunc("/share/{file}", s.handleMethodNotAllowed)
+	mux.HandleFunc("GET /share/{token}/{file}", s.handleNamed)
+	mux.HandleFunc("/share/{token}/{file}", s.handleMethodNotAllowed)
 }
 
 func (s *Server) handleMethodNotAllowed(w http.ResponseWriter, r *http.Request) {
@@ -57,7 +62,15 @@ func (s *Server) handleMethodNotAllowed(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
-	secret := strings.TrimSuffix(r.PathValue("file"), ".ics")
+	s.serve(w, r, strings.TrimSuffix(r.PathValue("file"), ".ics"))
+}
+
+// handleNamed serves /share/<token>/<name>.ics; the name segment is ignored.
+func (s *Server) handleNamed(w http.ResponseWriter, r *http.Request) {
+	s.serve(w, r, r.PathValue("token"))
+}
+
+func (s *Server) serve(w http.ResponseWriter, r *http.Request, secret string) {
 	if secret == "" {
 		http.NotFound(w, r)
 		return
