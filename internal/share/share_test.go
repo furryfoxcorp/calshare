@@ -142,3 +142,33 @@ func indexOf(h, n string) int {
 	}
 	return -1
 }
+
+func TestShareEmptyViewServesValidCalendar(t *testing.T) {
+	// A view with no calendars must serve a valid empty calendar, not 500.
+	db, err := storage.Open(filepath.Join(t.TempDir(), "empty.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	ctx := context.Background()
+	db.Migrate(ctx)
+	u, _ := db.UpsertUserOnLogin(ctx, "s", "owner@example.com", "Owner")
+	view, _ := db.CreateView(ctx, &storage.View{UserID: u.ID, Name: "Empty", Preset: "titles"})
+	secret, _ := storage.NewShareTokenSecret()
+	db.CreateShareToken(ctx, view.ID, "x", secret, "", nil)
+
+	srv := NewServer(db)
+	mux := http.NewServeMux()
+	srv.Register(mux)
+	req := httptest.NewRequest("GET", "/share/"+secret+".ics", nil)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	res := w.Result()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", res.StatusCode)
+	}
+	out, _ := io.ReadAll(res.Body)
+	if !contains(string(out), "BEGIN:VCALENDAR") || !contains(string(out), "END:VCALENDAR") {
+		t.Errorf("not a valid empty calendar:\n%s", out)
+	}
+}

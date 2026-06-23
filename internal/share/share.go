@@ -153,10 +153,32 @@ func (s *Server) render(r *http.Request, view *storage.View) ([]byte, error) {
 		}
 	}
 
+	// A view with no calendars, or no events in the window, yields a calendar
+	// with no components. go-ical refuses to encode that, so emit a valid empty
+	// VCALENDAR by hand instead of failing the request.
+	if !hasComponents(out) {
+		return emptyCalendar(view.Name), nil
+	}
 	if err := ical.BundleTimezones(out); err != nil {
 		return nil, err
 	}
 	return ical.Emit(out)
+}
+
+func hasComponents(cal *goical.Calendar) bool {
+	return len(cal.Children) > 0
+}
+
+// emptyCalendar renders a valid but eventless VCALENDAR, which calendar clients
+// accept as an empty subscription.
+func emptyCalendar(name string) []byte {
+	var b bytes.Buffer
+	b.WriteString("BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//furryfoxcorp//calshare//EN\r\nCALSCALE:GREGORIAN\r\n")
+	if name != "" {
+		fmt.Fprintf(&b, "X-WR-CALNAME:%s\r\n", name)
+	}
+	b.WriteString("END:VCALENDAR\r\n")
+	return b.Bytes()
 }
 
 func overlaps(o *storage.Object, w ical.Range) bool {
