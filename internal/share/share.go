@@ -57,7 +57,14 @@ func (s *Server) Register(mux *http.ServeMux) {
 }
 
 func (s *Server) handleMethodNotAllowed(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Allow", "GET, HEAD")
+	// OPTIONS must be answered, not refused: a plain ICS resource advertises
+	// only GET/HEAD and, crucially, no DAV capabilities, so a probing client
+	// stops treating the link as CalDAV. Everything else gets 405.
+	w.Header().Set("Allow", "OPTIONS, GET, HEAD")
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 	http.Error(w, "this is an ICS subscription link; use GET", http.StatusMethodNotAllowed)
 }
 
