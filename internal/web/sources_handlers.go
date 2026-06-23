@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/furryfoxcorp/calshare/internal/oidc"
+	"github.com/furryfoxcorp/calshare/internal/secret"
 	"github.com/furryfoxcorp/calshare/internal/sources"
 	"github.com/furryfoxcorp/calshare/internal/storage"
 )
@@ -47,6 +48,15 @@ func (s *Server) handleAddSource(w http.ResponseWriter, r *http.Request) {
 			interval = mins * 60
 		}
 	}
+
+	basicUser := strings.TrimSpace(r.FormValue("basic_user"))
+	var passEnc []byte
+	if pass := r.FormValue("basic_pass"); pass != "" && len(s.dataKey) == 32 {
+		if enc, err := secret.Encrypt(s.dataKey, []byte(pass)); err == nil {
+			passEnc = enc
+		}
+	}
+
 	cal, err := s.db.CreateCalendar(r.Context(), &storage.Calendar{
 		UserID:          user.ID,
 		SourceType:      "ics",
@@ -55,6 +65,8 @@ func (s *Server) handleAddSource(w http.ResponseWriter, r *http.Request) {
 		SupportsVTODO:   false,
 		ICSURL:          url,
 		ICSPollInterval: interval,
+		ICSBasicUser:    basicUser,
+		ICSBasicPassEnc: passEnc,
 	})
 	if err != nil {
 		http.Error(w, "could not add subscription", http.StatusInternalServerError)
@@ -63,7 +75,7 @@ func (s *Server) handleAddSource(w http.ResponseWriter, r *http.Request) {
 	s.audited(r, "source.add", "calendar", cal.ID, map[string]any{"url": url})
 	// Fetch once immediately so the list shows real status.
 	go func(c storage.Calendar) {
-		poller := sources.New(s.db, 15*time.Minute, slog.Default())
+		poller := sources.New(s.db, 15*time.Minute, s.dataKey, slog.Default())
 		_ = poller.PollOnce(context.Background(), &c)
 	}(*cal)
 
@@ -82,7 +94,7 @@ func (s *Server) handlePollSource(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
-	poller := sources.New(s.db, 15*time.Minute, slog.Default())
+	poller := sources.New(s.db, 15*time.Minute, s.dataKey, slog.Default())
 	_ = poller.PollOnce(r.Context(), cal)
 	s.writeSourceList(w, r, user.ID)
 }

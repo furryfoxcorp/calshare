@@ -27,6 +27,7 @@ type Server struct {
 	sessions    *oidc.Manager
 	auth        *oidc.Authenticator // may be nil if OIDC is not yet reachable
 	audit       *audit.Logger
+	dataKey     []byte
 	externalURL string
 	pages       map[string]*template.Template
 	login       *template.Template
@@ -35,7 +36,7 @@ type Server struct {
 
 // NewServer builds the web server. auth may be nil; when nil the login page
 // explains that SSO is unavailable. audit may be nil to skip audit logging.
-func NewServer(db *storage.DB, sessions *oidc.Manager, auth *oidc.Authenticator, audlog *audit.Logger, externalURL string) *Server {
+func NewServer(db *storage.DB, sessions *oidc.Manager, auth *oidc.Authenticator, audlog *audit.Logger, dataKey []byte, externalURL string) *Server {
 	funcs := template.FuncMap{"date": fmtDate}
 
 	pageFiles := map[string]string{
@@ -59,6 +60,7 @@ func NewServer(db *storage.DB, sessions *oidc.Manager, auth *oidc.Authenticator,
 		sessions:    sessions,
 		auth:        auth,
 		audit:       audlog,
+		dataKey:     dataKey,
 		externalURL: externalURL,
 		pages:       pages,
 		login:       template.Must(template.New("").Funcs(funcs).ParseFS(tmplFS, "templates/login.html")),

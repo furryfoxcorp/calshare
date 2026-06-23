@@ -17,6 +17,7 @@ import (
 	goical "github.com/emersion/go-ical"
 
 	"github.com/furryfoxcorp/calshare/internal/ical"
+	"github.com/furryfoxcorp/calshare/internal/secret"
 	"github.com/furryfoxcorp/calshare/internal/storage"
 )
 
@@ -26,16 +27,19 @@ type Poller struct {
 	client          *http.Client
 	logger          *slog.Logger
 	defaultInterval time.Duration
+	dataKey         []byte // decrypts stored feed credentials
 }
 
 // New builds a poller. defaultInterval is used for feeds with no explicit
-// interval.
-func New(db *storage.DB, defaultInterval time.Duration, logger *slog.Logger) *Poller {
+// interval. dataKey decrypts upstream Basic-auth passwords; it may be nil when
+// no feed uses credentials.
+func New(db *storage.DB, defaultInterval time.Duration, dataKey []byte, logger *slog.Logger) *Poller {
 	return &Poller{
 		db:              db,
 		client:          &http.Client{Timeout: 30 * time.Second},
 		logger:          logger,
 		defaultInterval: defaultInterval,
+		dataKey:         dataKey,
 	}
 }
 
@@ -100,7 +104,13 @@ func (p *Poller) PollOnce(ctx context.Context, c *storage.Calendar) error {
 		req.Header.Set("If-Modified-Since", c.ICSLastModified)
 	}
 	if c.ICSBasicUser != "" {
-		req.SetBasicAuth(c.ICSBasicUser, "")
+		pass := ""
+		if len(c.ICSBasicPassEnc) > 0 && len(p.dataKey) == 32 {
+			if dec, err := secret.Decrypt(p.dataKey, c.ICSBasicPassEnc); err == nil {
+				pass = string(dec)
+			}
+		}
+		req.SetBasicAuth(c.ICSBasicUser, pass)
 	}
 
 	resp, err := p.client.Do(req)

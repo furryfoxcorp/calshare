@@ -30,6 +30,16 @@
       <label for="interval">Check every (minutes)</label>
       <input type="number" id="interval" name="interval" min="5" placeholder="15">
     </div>
+    <div class="field">
+      <label for="basic_user">Feed username (optional)</label>
+      <input type="text" id="basic_user" name="basic_user" autocomplete="off">
+      <div class="hint">Only if the feed needs HTTP Basic credentials.</div>
+    </div>
+    <div class="field">
+      <label for="basic_pass">Feed password (optional)</label>
+      <input type="password" id="basic_pass" name="basic_pass" autocomplete="off">
+      <div class="hint">Stored encrypted with the server data key.</div>
+    </div>
     <div class="actions"><button class="btn" type="submit">Add subscription</button></div>
   </form>
 </section>

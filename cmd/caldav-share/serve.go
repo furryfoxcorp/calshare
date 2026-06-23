@@ -71,6 +71,10 @@ func runServe(cmd *cobra.Command) error {
 	if err != nil {
 		return err
 	}
+	dataKey, err := db.DataKey(cmd.Context(), deriveKey(cfg.DataKey))
+	if err != nil {
+		return err
+	}
 	secure := strings.HasPrefix(cfg.ExternalURL, "https://")
 	sessions := oidc.NewManager(db, sessionKey, secure)
 
@@ -97,7 +101,7 @@ func runServe(cmd *cobra.Command) error {
 	mux := http.NewServeMux()
 	caldav.NewServer(db, "/dav", cfg.TrustProxyHeaders, sched).Register(mux)
 	share.NewServer(db).Register(mux)
-	web.NewServer(db, sessions, auth, audit.New(db, logger), cfg.ExternalURL).Register(mux)
+	web.NewServer(db, sessions, auth, audit.New(db, logger), dataKey, cfg.ExternalURL).Register(mux)
 
 	srv := &http.Server{
 		Addr:              cfg.ListenAddr,
@@ -109,7 +113,7 @@ func runServe(cmd *cobra.Command) error {
 	defer stop()
 
 	// Poll external ICS feeds in the background.
-	go sources.New(db, cfg.ICSDefaultPollInterval, logger).Run(ctx)
+	go sources.New(db, cfg.ICSDefaultPollInterval, dataKey, logger).Run(ctx)
 
 	// Send queued external invitations over SMTP, and poll for replies.
 	smtpCfg := imip.SMTPConfig{

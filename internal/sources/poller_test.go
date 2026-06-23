@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/furryfoxcorp/calshare/internal/secret"
 	"github.com/furryfoxcorp/calshare/internal/storage"
 )
 
@@ -66,7 +67,7 @@ func TestPollImportsEvents(t *testing.T) {
 	}))
 	defer srv.Close()
 	db, cal := newPollerDB(t, srv.URL)
-	p := New(db, 15*time.Minute, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	p := New(db, 15*time.Minute, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err := p.PollOnce(context.Background(), cal); err != nil {
 		t.Fatalf("PollOnce: %v", err)
 	}
@@ -87,7 +88,7 @@ func TestPollDeletesRemovedEvents(t *testing.T) {
 	}))
 	defer srv.Close()
 	db, cal := newPollerDB(t, srv.URL)
-	p := New(db, 15*time.Minute, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	p := New(db, 15*time.Minute, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
 
 	if err := p.PollOnce(context.Background(), cal); err != nil {
 		t.Fatal(err)
@@ -113,7 +114,7 @@ func TestPollNotModified(t *testing.T) {
 	}))
 	defer srv.Close()
 	db, cal := newPollerDB(t, srv.URL)
-	p := New(db, 15*time.Minute, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	p := New(db, 15*time.Minute, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
 
 	p.PollOnce(context.Background(), cal)
 	fresh, _ := db.CalendarByID(context.Background(), cal.ID)
@@ -137,7 +138,7 @@ func TestPollHTTPErrorKeepsEvents(t *testing.T) {
 	}))
 	defer srv.Close()
 	db, cal := newPollerDB(t, srv.URL)
-	p := New(db, 15*time.Minute, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	p := New(db, 15*time.Minute, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
 
 	p.PollOnce(context.Background(), cal)
 	mode = "fail"
@@ -148,5 +149,44 @@ func TestPollHTTPErrorKeepsEvents(t *testing.T) {
 	objs, _ := db.ListObjects(context.Background(), cal.ID)
 	if len(objs) != 2 {
 		t.Fatalf("events should survive an HTTP error, got %d", len(objs))
+	}
+}
+
+func TestPollSendsBasicAuth(t *testing.T) {
+	gotUser, gotPass := "", ""
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotUser, gotPass, _ = r.BasicAuth()
+		io.WriteString(w, feedV1)
+	}))
+	defer srv.Close()
+
+	key := make([]byte, 32)
+	for i := range key {
+		key[i] = byte(i)
+	}
+	enc, err := secret.Encrypt(key, []byte("feedpass"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	db, err := storage.Open(filepath.Join(t.TempDir(), "ba.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	ctx := context.Background()
+	db.Migrate(ctx)
+	u, _ := db.UpsertUserOnLogin(ctx, "s", "u@example.com", "U")
+	cal, _ := db.CreateCalendar(ctx, &storage.Calendar{
+		UserID: u.ID, SourceType: "ics", DisplayName: "Private feed",
+		ICSURL: srv.URL, ICSBasicUser: "feeduser", ICSBasicPassEnc: enc,
+	})
+
+	p := New(db, 15*time.Minute, key, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err := p.PollOnce(ctx, cal); err != nil {
+		t.Fatal(err)
+	}
+	if gotUser != "feeduser" || gotPass != "feedpass" {
+		t.Errorf("basic auth = %q:%q, want feeduser:feedpass", gotUser, gotPass)
 	}
 }
