@@ -202,3 +202,55 @@ func TestExcludedMasterPromotesPublicOverride(t *testing.T) {
 		t.Error("promoted standalone event should drop RECURRENCE-ID")
 	}
 }
+
+func TestUnknownAndXPropsStripped(t *testing.T) {
+	// Outlook ships the full description in X-ALT-DESC alongside DESCRIPTION,
+	// and other feeds use X-APPLE-NOTES / CONTACT. None should survive a
+	// non-full preset.
+	body := `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//t//EN
+BEGIN:VEVENT
+UID:leak-1
+DTSTAMP:20260101T000000Z
+DTSTART:20260105T090000Z
+DTEND:20260105T100000Z
+SUMMARY:Therapy
+X-ALT-DESC:The full private description
+X-APPLE-NOTES:secret notes
+CONTACT:Dr. Smith 555-1234
+END:VEVENT
+END:VCALENDAR
+`
+	out, err := Apply(parse(t, body), Spec{Preset: PresetBusy, IncludeTentative: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := emit(t, out)
+	for _, leak := range []string{"X-ALT-DESC", "full private description", "X-APPLE-NOTES", "secret notes", "CONTACT", "Dr. Smith"} {
+		if strings.Contains(s, leak) {
+			t.Errorf("leaked %q through busy preset:\n%s", leak, s)
+		}
+	}
+	// Structural fields still present.
+	if !strings.Contains(s, "DTSTART:20260105T090000Z") || !strings.Contains(s, "UID:leak-1") {
+		t.Error("structural fields were dropped")
+	}
+}
+
+func TestKeptAlarmStripsDescription(t *testing.T) {
+	body := strings.Replace(richEvent, "BEGIN:VALARM\nACTION:DISPLAY\nTRIGGER:-PT15M\nEND:VALARM",
+		"BEGIN:VALARM\nACTION:DISPLAY\nTRIGGER:-PT15M\nDESCRIPTION:Take the secret pills\nEND:VALARM", 1)
+	out, _ := Apply(parse(t, body), Spec{
+		Preset:           PresetFull,
+		IncludeTentative: true,
+		FieldOverrides:   map[string]Rule{"VALARM": Keep},
+	})
+	s := emit(t, out)
+	if !strings.Contains(s, "BEGIN:VALARM") {
+		t.Fatal("VALARM should be kept when overridden to Keep")
+	}
+	if strings.Contains(s, "Take the secret pills") {
+		t.Errorf("alarm DESCRIPTION leaked:\n%s", s)
+	}
+}

@@ -167,27 +167,39 @@ func dropByFlags(c *goical.Component, s Spec) bool {
 	return false
 }
 
-// filterEvent returns a copy of the event with field rules applied.
+// structuralProps are the timing and identity properties that define the
+// event and are always preserved regardless of preset. Everything not in this
+// set and not explicitly kept by a field rule is stripped, so unknown and X-*
+// properties (for example Outlook's X-ALT-DESC, which carries the full
+// description) can never leak through a privacy view.
+var structuralProps = map[string]bool{
+	"UID": true, "DTSTART": true, "DTEND": true, "DURATION": true,
+	"RRULE": true, "RDATE": true, "EXDATE": true, "RECURRENCE-ID": true,
+}
+
+// filterEvent returns a copy of the event with field rules applied. The policy
+// is default-strip: a property is emitted only if it is structural or a field
+// rule keeps (or replaces) it.
 func filterEvent(src *goical.Component, rules map[string]Rule, busyLabel string) *goical.Component {
 	dst := goical.NewComponent(ical.CompEvent)
 
 	for name, props := range src.Props {
 		rule, managed := rules[name]
-		if !managed {
+		switch {
+		case managed && rule == Keep:
 			dst.Props[name] = copyProps(props)
-			continue
-		}
-		switch rule {
-		case Keep:
-			dst.Props[name] = copyProps(props)
-		case Replace:
+		case managed && rule == Replace:
 			if name == "SUMMARY" {
 				dst.Props.SetText("SUMMARY", busyLabel)
 			} else {
 				dst.Props[name] = copyProps(props)
 			}
-		case Strip:
+		case managed && rule == Strip:
 			// omit
+		case structuralProps[name]:
+			dst.Props[name] = copyProps(props)
+		default:
+			// Unknown or X-* property: strip by default to avoid leaks.
 		}
 	}
 
@@ -196,12 +208,30 @@ func filterEvent(src *goical.Component, rules map[string]Rule, busyLabel string)
 		dst.Props.SetText("SUMMARY", busyLabel)
 	}
 
-	// Copy child components, honoring the VALARM rule.
+	// Copy child components, honoring the VALARM rule. A kept VALARM has its
+	// own descriptive sub-properties stripped so they cannot leak details.
 	for _, sub := range src.Children {
-		if sub.Name == "VALARM" && rules["VALARM"] == Strip {
+		if sub.Name == "VALARM" {
+			if rules["VALARM"] == Strip {
+				continue
+			}
+			dst.Children = append(dst.Children, sanitizeAlarm(sub))
 			continue
 		}
 		dst.Children = append(dst.Children, sub)
+	}
+	return dst
+}
+
+// sanitizeAlarm returns a copy of a VALARM with descriptive fields removed,
+// keeping only the mechanics (ACTION, TRIGGER, DURATION, REPEAT).
+func sanitizeAlarm(src *goical.Component) *goical.Component {
+	keep := map[string]bool{"ACTION": true, "TRIGGER": true, "DURATION": true, "REPEAT": true}
+	dst := goical.NewComponent("VALARM")
+	for name, props := range src.Props {
+		if keep[name] {
+			dst.Props[name] = copyProps(props)
+		}
 	}
 	return dst
 }

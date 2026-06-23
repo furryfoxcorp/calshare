@@ -100,3 +100,20 @@ func TestBuildReplyKeepsOnlyReplier(t *testing.T) {
 		t.Errorf("reply should carry the new PARTSTAT:\n%s", s)
 	}
 }
+
+func TestOutboundStripsScheduleStatus(t *testing.T) {
+	// An event whose attendee carries a server-set SCHEDULE-STATUS must not
+	// carry it into the outbound REQUEST.
+	body := "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//t//EN\r\nBEGIN:VEVENT\r\nUID:ss-1\r\nDTSTAMP:20260101T000000Z\r\nDTSTART:20260110T150000Z\r\nSUMMARY:Sync\r\nORGANIZER:mailto:owner@example.com\r\nATTENDEE;PARTSTAT=NEEDS-ACTION;SCHEDULE-STATUS=1.2:mailto:zoe@example.com\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+	out, err := BuildRequest(parse(t, body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := emit(t, out)
+	if strings.Contains(s, "SCHEDULE-STATUS") {
+		t.Errorf("SCHEDULE-STATUS leaked into outbound REQUEST:\n%s", s)
+	}
+	if !strings.Contains(s, "zoe@example.com") {
+		t.Error("attendee dropped")
+	}
+}

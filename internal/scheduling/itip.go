@@ -36,7 +36,7 @@ func cloneCalendar(src *goical.Calendar, method string) *goical.Calendar {
 func cloneEvent(src *goical.Component) *goical.Component {
 	dst := goical.NewComponent(ical.CompEvent)
 	for name, props := range src.Props {
-		dst.Props[name] = copyProps(props)
+		dst.Props[name] = stripServerParams(copyProps(props))
 	}
 	for _, sub := range src.Children {
 		if sub.Name == "VALARM" {
@@ -45,6 +45,24 @@ func cloneEvent(src *goical.Component) *goical.Component {
 		dst.Children = append(dst.Children, sub)
 	}
 	return dst
+}
+
+// serverParams are scheduling parameters the server maintains on the
+// organizer's stored copy; they must never be sent to attendees.
+var serverParams = []string{"SCHEDULE-STATUS", "SCHEDULE-AGENT", "SCHEDULE-FORCE-SEND"}
+
+// stripServerParams removes server-only scheduling parameters from properties
+// (notably SCHEDULE-STATUS on ATTENDEE) before they go out in an iTIP message.
+func stripServerParams(props []goical.Prop) []goical.Prop {
+	for i := range props {
+		if props[i].Params == nil {
+			continue
+		}
+		for _, p := range serverParams {
+			delete(props[i].Params, p)
+		}
+	}
+	return props
 }
 
 func copyProps(in []goical.Prop) []goical.Prop {

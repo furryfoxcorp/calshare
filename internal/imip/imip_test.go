@@ -141,3 +141,30 @@ func TestRunNoopWhenUnconfigured(t *testing.T) {
 func discardLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
+
+func TestBuildRejectsHeaderInjection(t *testing.T) {
+	msg := Build(Envelope{
+		From:      "owner@example.com",
+		To:        "guest@elsewhere.com",
+		Subject:   "Planning\r\nBcc: victim@evil.com", // injection attempt
+		MessageID: "<abc@calshare>",
+		Method:    "REQUEST",
+		ICal:      []byte(sampleICal),
+		Date:      time.Now().UTC(),
+	})
+	s := string(msg)
+	headerEnd := strings.Index(s, "\r\n\r\n")
+	if headerEnd < 0 {
+		t.Fatal("no header/body separator")
+	}
+	// No header line may START with Bcc: the injected newline must be
+	// neutralized, leaving "Bcc:" as harmless text inside the Subject value.
+	for _, line := range strings.Split(s[:headerEnd], "\r\n") {
+		if strings.HasPrefix(line, "Bcc:") {
+			t.Errorf("header injection succeeded, real Bcc header present:\n%s", s[:headerEnd])
+		}
+	}
+	if !strings.Contains(s, "Subject: Planning") {
+		t.Error("subject mangled")
+	}
+}

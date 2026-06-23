@@ -38,7 +38,9 @@ func Build(e Envelope) []byte {
 	var b bytes.Buffer
 	header := func(k, v string) {
 		if v != "" {
-			fmt.Fprintf(&b, "%s: %s\r\n", k, v)
+			// Strip CR/LF so a value derived from event data (a SUMMARY can be
+			// attacker-controlled and may carry newlines) cannot inject headers.
+			fmt.Fprintf(&b, "%s: %s\r\n", k, headerSafe(v))
 		}
 	}
 	header("From", e.From)
@@ -136,6 +138,11 @@ func Subject(method, summary string) string {
 	default:
 		return "Invitation: " + summary
 	}
+}
+
+// headerSafe removes CR and LF from a header value to prevent header injection.
+func headerSafe(s string) string {
+	return strings.NewReplacer("\r", " ", "\n", " ").Replace(s)
 }
 
 func wrap76(s string) string {
