@@ -127,6 +127,24 @@ precedence.
 | `CALDAV_IMAP_POLL_INTERVAL` | `60s` | How often to poll |
 | `CALDAV_IMAP_PROCESSED_FOLDER` | empty | Move handled messages here instead of marking them read |
 
+## Local development sign-in
+
+OIDC needs a real provider, which is awkward when hacking locally. Setting
+`CALDAV_DEV_LOGIN_PASSWORD` (and optionally `CALDAV_DEV_LOGIN_EMAIL`, default
+`dev@localhost`) enables a password form on the login page that signs you in as
+an admin without OIDC. It is off whenever the variable is unset.
+
+Never set this in production: it bypasses single sign-on. There is no default
+password and nothing is hardcoded; the feature exists only when you opt in with
+the environment variable.
+
+```
+CALDAV_DEV_LOGIN_EMAIL=you@localhost CALDAV_DEV_LOGIN_PASSWORD=somelocalsecret \
+  CALDAV_EXTERNAL_URL=http://localhost:8080 \
+  CALDAV_OIDC_ISSUER=unused CALDAV_OIDC_CLIENT_ID=unused CALDAV_OIDC_CLIENT_SECRET=unused \
+  caldav-share serve
+```
+
 ## Setting up OIDC
 
 Using Keycloak as an example:

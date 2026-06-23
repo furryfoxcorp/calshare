@@ -1,0 +1,31 @@
+name: Release
+
+# Build cross-platform release archives with giftwrap when a version tag is
+# pushed (for example v0.1.0), and attach them to a GitHub Release. giftwrap
+# reads the version from the tag, so the checkout needs full history/tags.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+          cache: true
+      - name: Build release archives
+        run: go run github.com/indrora/giftwrap@main release
+      - name: Publish to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: _dist/*
+          generate_release_notes: true

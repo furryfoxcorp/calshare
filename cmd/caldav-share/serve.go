@@ -101,7 +101,12 @@ func runServe(cmd *cobra.Command) error {
 	mux := http.NewServeMux()
 	caldav.NewServer(db, "/dav", cfg.TrustProxyHeaders, sched).Register(mux)
 	share.NewServer(db).Register(mux)
-	web.NewServer(db, sessions, auth, audit.New(db, logger), sched, dataKey, cfg.ExternalURL).Register(mux)
+	webSrv := web.NewServer(db, sessions, auth, audit.New(db, logger), sched, dataKey, cfg.ExternalURL)
+	if pw := os.Getenv("CALDAV_DEV_LOGIN_PASSWORD"); pw != "" {
+		webSrv.EnableDevLogin(os.Getenv("CALDAV_DEV_LOGIN_EMAIL"), pw)
+		logger.Warn("development login is ENABLED; never use this in production")
+	}
+	webSrv.Register(mux)
 
 	srv := &http.Server{
 		Addr:              cfg.ListenAddr,
