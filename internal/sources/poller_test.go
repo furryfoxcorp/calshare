@@ -225,3 +225,18 @@ func TestDueRespectsBackoff(t *testing.T) {
 		t.Error("should not be due while backing off")
 	}
 }
+
+func TestNormalizeFeedURL(t *testing.T) {
+	cases := map[string]string{
+		"webcal://p149-caldav.icloud.com/published/2/abc":  "https://p149-caldav.icloud.com/published/2/abc",
+		"webcals://example.com/cal.ics":                    "https://example.com/cal.ics",
+		"https://example.com/cal.ics":                      "https://example.com/cal.ics",
+		"http://example.com/cal.ics":                       "http://example.com/cal.ics",
+	}
+	for in, want := range cases {
+		if got := NormalizeFeedURL(in); got != want {
+			t.Errorf("NormalizeFeedURL(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+

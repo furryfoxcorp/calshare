@@ -36,7 +36,7 @@ func (s *Server) handleSources(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleAddSource(w http.ResponseWriter, r *http.Request) {
 	user, _ := oidc.UserFromContext(r.Context())
-	url := strings.TrimSpace(r.FormValue("url"))
+	url := sources.NormalizeFeedURL(strings.TrimSpace(r.FormValue("url")))
 	name := strings.TrimSpace(r.FormValue("name"))
 	if url == "" || name == "" {
 		http.Error(w, "link and name are required", http.StatusBadRequest)

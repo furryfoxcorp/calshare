@@ -120,7 +120,7 @@ func (p *Poller) interval(c *storage.Calendar) time.Duration {
 // PollOnce fetches one feed and syncs it. It records poll state regardless of
 // outcome and never deletes existing events on a transport error.
 func (p *Poller) PollOnce(ctx context.Context, c *storage.Calendar) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.ICSURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, NormalizeFeedURL(c.ICSURL), nil)
 	if err != nil {
 		return err
 	}
@@ -223,6 +223,20 @@ func (p *Poller) sync(ctx context.Context, c *storage.Calendar, body []byte) err
 		}
 	}
 	return nil
+}
+
+// NormalizeFeedURL rewrites a webcal:// or webcals:// subscription URL (what
+// Apple, Google, and Outlook hand out) to the https:// the HTTP client can
+// actually fetch.
+func NormalizeFeedURL(u string) string {
+	switch {
+	case strings.HasPrefix(u, "webcals://"):
+		return "https://" + strings.TrimPrefix(u, "webcals://")
+	case strings.HasPrefix(u, "webcal://"):
+		return "https://" + strings.TrimPrefix(u, "webcal://")
+	default:
+		return u
+	}
 }
 
 // startupJitter returns a small random delay (0 to 30 seconds) so a server
