@@ -13,7 +13,9 @@ import (
 	"time"
 
 	"github.com/furryfoxcorp/calshare/internal/caldav"
+	"github.com/furryfoxcorp/calshare/internal/imip"
 	"github.com/furryfoxcorp/calshare/internal/oidc"
+	"github.com/furryfoxcorp/calshare/internal/scheduling"
 	"github.com/furryfoxcorp/calshare/internal/share"
 	"github.com/furryfoxcorp/calshare/internal/sources"
 	"github.com/furryfoxcorp/calshare/internal/storage"
@@ -86,8 +88,13 @@ func runServe(cmd *cobra.Command) error {
 		auth = a
 	}
 
+	var sched *scheduling.Scheduler
+	if cfg.SchedulingEnabled {
+		sched = scheduling.New(db)
+	}
+
 	mux := http.NewServeMux()
-	caldav.NewServer(db, "/dav", cfg.TrustProxyHeaders).Register(mux)
+	caldav.NewServer(db, "/dav", cfg.TrustProxyHeaders, sched).Register(mux)
 	share.NewServer(db).Register(mux)
 	web.NewServer(db, sessions, auth, cfg.ExternalURL).Register(mux)
 
@@ -102,6 +109,25 @@ func runServe(cmd *cobra.Command) error {
 
 	// Poll external ICS feeds in the background.
 	go sources.New(db, cfg.ICSDefaultPollInterval, logger).Run(ctx)
+
+	// Send queued external invitations over SMTP, and poll for replies.
+	smtpCfg := imip.SMTPConfig{
+		Host: cfg.SMTPHost, Port: cfg.SMTPPort, User: cfg.SMTPUser, Pass: cfg.SMTPPass,
+		TLS: cfg.SMTPTLS, FromOverride: cfg.IMIPFromOverride, ReplyAddress: cfg.IMIPReplyAddress,
+	}
+	if smtpCfg.Configured() {
+		go imip.NewSender(db, smtpCfg, logger).Run(ctx)
+	} else {
+		logger.Info("SMTP not configured; external invitations will be queued but not sent")
+	}
+	if cfg.IMAPHost != "" {
+		imapCfg := imip.IMAPConfig{
+			Host: cfg.IMAPHost, Port: cfg.IMAPPort, User: cfg.IMAPUser, Pass: cfg.IMAPPass,
+			TLS: cfg.IMAPTLS, Folder: cfg.IMAPFolder, PollInterval: cfg.IMAPPollInterval,
+			ProcessedFolder: cfg.IMAPProcessedDir,
+		}
+		go imip.NewReceiver(db, imapCfg, logger).Run(ctx)
+	}
 
 	errCh := make(chan error, 1)
 	go func() {

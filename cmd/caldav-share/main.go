@@ -28,6 +28,7 @@ func main() {
 		newServeCmd(),
 		newMigrateCmd(),
 		newDoctorCmd(),
+		newIMIPCmd(),
 	)
 
 	if err := root.Execute(); err != nil {

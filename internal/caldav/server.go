@@ -6,6 +6,7 @@ import (
 
 	"github.com/emersion/go-webdav/caldav"
 
+	"github.com/furryfoxcorp/calshare/internal/scheduling"
 	"github.com/furryfoxcorp/calshare/internal/storage"
 )
 
@@ -19,15 +20,15 @@ type Server struct {
 
 // NewServer builds a CalDAV server. prefix is the mount point (for example
 // "/dav"); trustProxy controls whether X-Forwarded-For is honored for client
-// IP logging.
-func NewServer(db *storage.DB, prefix string, trustProxy bool) *Server {
+// IP logging. sched may be nil to disable auto-schedule.
+func NewServer(db *storage.DB, prefix string, trustProxy bool, sched *scheduling.Scheduler) *Server {
 	prefix = "/" + strings.Trim(prefix, "/")
 	return &Server{
 		db:         db,
 		prefix:     prefix,
 		trustProxy: trustProxy,
 		handler: &caldav.Handler{
-			Backend: NewBackend(db, prefix),
+			Backend: NewBackend(db, prefix, sched),
 			Prefix:  prefix,
 		},
 	}

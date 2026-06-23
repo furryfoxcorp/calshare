@@ -45,7 +45,7 @@ func newFixture(t *testing.T) *fixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &fixture{srv: NewServer(db, "/dav", false), db: db, user: u, cal: cal}
+	return &fixture{srv: NewServer(db, "/dav", false, nil), db: db, user: u, cal: cal}
 }
 
 func (f *fixture) do(t *testing.T, method, path, body string, headers map[string]string) *http.Response {

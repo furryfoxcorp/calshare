@@ -11,6 +11,7 @@ import (
 	"github.com/emersion/go-webdav/caldav"
 
 	"github.com/furryfoxcorp/calshare/internal/ical"
+	"github.com/furryfoxcorp/calshare/internal/scheduling"
 	"github.com/furryfoxcorp/calshare/internal/storage"
 )
 
@@ -19,14 +20,15 @@ const maxResourceSize = 10 << 20 // 10 MiB
 
 // Backend implements caldav.Backend over the project's storage.
 type Backend struct {
-	db     *storage.DB
+	db    *storage.DB
 	prefix string
+	sched *scheduling.Scheduler // may be nil when scheduling is disabled
 }
 
 // NewBackend builds a CalDAV backend. prefix is the URL prefix the handler is
-// mounted at, for example "/dav".
-func NewBackend(db *storage.DB, prefix string) *Backend {
-	return &Backend{db: db, prefix: prefix}
+// mounted at, for example "/dav". sched may be nil to disable auto-schedule.
+func NewBackend(db *storage.DB, prefix string, sched *scheduling.Scheduler) *Backend {
+	return &Backend{db: db, prefix: prefix, sched: sched}
 }
 
 func authedUser(ctx context.Context) (*storage.User, error) {
@@ -265,6 +267,14 @@ func (b *Backend) PutCalendarObject(ctx context.Context, path string, cal *goica
 			return nil, webdav.NewHTTPError(http.StatusConflict, err)
 		default:
 			return nil, webdav.NewHTTPError(http.StatusBadRequest, err)
+		}
+	}
+
+	// Auto-schedule: deliver invitations for events that carry attendees.
+	// Failures here must not fail the PUT itself.
+	if b.sched != nil && obj.HasScheduling {
+		if authed, aerr := authedUser(ctx); aerr == nil {
+			_, _ = b.sched.OnPut(ctx, obj, authed)
 		}
 	}
 

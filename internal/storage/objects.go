@@ -176,6 +176,19 @@ func (db *DB) ObjectByUID(ctx context.Context, calendarID int64, uid string) (*O
 		"SELECT "+objCols+" FROM objects WHERE calendar_id = ? AND uid = ?", calendarID, uid))
 }
 
+// ObjectByUIDAny returns the first object with a given UID across all
+// calendars, used to match an inbound iMIP reply to its originating event.
+func (db *DB) ObjectByUIDAny(ctx context.Context, uid string) (*Object, error) {
+	return scanObject(db.QueryRowContext(ctx, "SELECT "+objCols+" FROM objects WHERE uid = ? ORDER BY id LIMIT 1", uid))
+}
+
+// CalendarOwner returns the user id that owns a calendar.
+func (db *DB) CalendarOwner(ctx context.Context, calendarID int64) (int64, error) {
+	var uid int64
+	err := db.QueryRowContext(ctx, "SELECT user_id FROM calendars WHERE id = ?", calendarID).Scan(&uid)
+	return uid, err
+}
+
 // ListObjects returns every object in a calendar.
 func (db *DB) ListObjects(ctx context.Context, calendarID int64) ([]Object, error) {
 	rows, err := db.QueryContext(ctx, "SELECT "+objCols+" FROM objects WHERE calendar_id = ? ORDER BY id", calendarID)
