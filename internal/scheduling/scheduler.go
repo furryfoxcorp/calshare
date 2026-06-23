@@ -67,6 +67,7 @@ func (s *Scheduler) OnPut(ctx context.Context, obj *storage.Object, organizer *s
 	}
 
 	res := &Result{}
+	statuses := map[string]string{}
 	for _, a := range attendees {
 		// Skip the organizer's own attendee line.
 		if normalizeEmail(a.email) == normalizeEmail(organizer.Email) {
@@ -92,13 +93,13 @@ func (s *Scheduler) OnPut(ctx context.Context, obj *storage.Object, organizer *s
 			if err := s.deliverLocal(ctx, local, organizer, obj.UID, requestBody); err != nil {
 				return nil, err
 			}
-			state.ScheduleStatus = "1.2"
+			state.ScheduleStatus = "1.2" // delivered to a local Inbox
 			res.LocalDelivered++
 		case deliver && local == nil:
 			if err := s.queueExternal(ctx, organizer, obj, a.email, requestBody); err != nil {
 				return nil, err
 			}
-			state.ScheduleStatus = "1.1"
+			state.ScheduleStatus = "1.1" // sent (queued) to an external address
 			res.ExternalQueued++
 		default:
 			state.ScheduleStatus = "" // client-managed; we only record state
@@ -107,8 +108,90 @@ func (s *Scheduler) OnPut(ctx context.Context, obj *storage.Object, organizer *s
 		if err := s.db.UpsertAttendeeState(ctx, state); err != nil {
 			return nil, err
 		}
+		if state.ScheduleStatus != "" {
+			statuses[normalizeEmail(a.email)] = state.ScheduleStatus
+		}
+	}
+
+	// Annotate the stored event with per-attendee SCHEDULE-STATUS so clients
+	// see the delivery outcome on their next sync (RFC 6638 3.2.3).
+	if len(statuses) > 0 {
+		s.writeScheduleStatus(ctx, obj, cal, master, statuses)
 	}
 	return res, nil
+}
+
+// writeScheduleStatus sets SCHEDULE-STATUS on the master event's ATTENDEE
+// properties and re-stores the object.
+func (s *Scheduler) writeScheduleStatus(ctx context.Context, obj *storage.Object, cal *goical.Calendar, master *goical.Component, statuses map[string]string) {
+	changed := false
+	for i := range master.Props["ATTENDEE"] {
+		p := &master.Props["ATTENDEE"][i]
+		st, ok := statuses[mailtoAddress(p.Value)]
+		if !ok {
+			continue
+		}
+		if p.Params == nil {
+			p.Params = goical.Params{}
+		}
+		p.Params.Set("SCHEDULE-STATUS", st)
+		changed = true
+	}
+	if !changed {
+		return
+	}
+	blob, err := ical.Emit(cal)
+	if err != nil {
+		return
+	}
+	_, _ = s.db.PutObject(ctx, obj.CalendarID, obj.Href, blob)
+}
+
+// OnDelete sends CANCEL messages when a scheduled event the user organizes is
+// removed. It is a no-op for events without attendees.
+func (s *Scheduler) OnDelete(ctx context.Context, obj *storage.Object, organizer *storage.User) error {
+	if !obj.HasScheduling {
+		return nil
+	}
+	cal, err := goical.NewDecoder(strings.NewReader(string(obj.Blob))).Decode()
+	if err != nil {
+		return err
+	}
+	master := masterEvent(cal)
+	if master == nil {
+		return nil
+	}
+	cancel, err := BuildCancel(cal)
+	if err != nil {
+		return err
+	}
+	body, err := ical.Emit(cancel)
+	if err != nil {
+		return err
+	}
+	for _, a := range extractAttendees(master) {
+		if normalizeEmail(a.email) == normalizeEmail(organizer.Email) {
+			continue
+		}
+		if a.agent != "" && !strings.EqualFold(a.agent, "SERVER") {
+			continue
+		}
+		if local, _ := s.db.UserByEmail(ctx, a.email); local != nil {
+			_ = s.db.CreateInboxObject(ctx, &storage.InboxObject{
+				UserID: local.ID, Href: sanitizeHref(obj.UID) + "-cancel.ics",
+				ETag: ical.ETag(body), Blob: body, Method: MethodCancel, UID: obj.UID,
+				OriginUserID: &organizer.ID, OriginEmail: organizer.Email,
+			})
+		} else {
+			msgID := generateMessageID(obj.UID)
+			objID := obj.ID
+			_, _ = s.db.EnqueueIMIP(ctx, &storage.IMIPMessage{
+				ObjectID: &objID, FromUserID: organizer.ID, ToAddress: a.email,
+				Method: MethodCancel, MessageID: msgID, UID: obj.UID, Body: body,
+			})
+		}
+	}
+	return nil
 }
 
 func (s *Scheduler) deliverLocal(ctx context.Context, recipient, organizer *storage.User, uid string, body []byte) error {
@@ -138,6 +221,39 @@ func (s *Scheduler) queueExternal(ctx context.Context, organizer *storage.User, 
 		Body:       body,
 	})
 	return err
+}
+
+// RespondLocal records a local attendee's response to an invitation and
+// delivers a REPLY to the organizer's Inbox. partstat is ACCEPTED, DECLINED,
+// or TENTATIVE.
+func (s *Scheduler) RespondLocal(ctx context.Context, recipient *storage.User, uid, partstat string) error {
+	obj, err := s.db.ObjectByUIDAny(ctx, uid)
+	if err != nil {
+		return err
+	}
+	_ = s.db.UpdateAttendeePartstat(ctx, obj.ID, recipient.Email, partstat, "2.0")
+
+	cal, err := goical.NewDecoder(strings.NewReader(string(obj.Blob))).Decode()
+	if err != nil {
+		return err
+	}
+	reply, err := BuildReply(cal, recipient.Email, partstat)
+	if err != nil {
+		return err
+	}
+	body, err := ical.Emit(reply)
+	if err != nil {
+		return err
+	}
+	ownerID, err := s.db.CalendarOwner(ctx, obj.CalendarID)
+	if err != nil {
+		return err
+	}
+	return s.db.CreateInboxObject(ctx, &storage.InboxObject{
+		UserID: ownerID, Href: sanitizeHref(uid) + "-reply-" + sanitizeHref(recipient.Email) + ".ics",
+		ETag: ical.ETag(body), Blob: body, Method: MethodReply, UID: uid,
+		OriginUserID: &recipient.ID, OriginEmail: recipient.Email,
+	})
 }
 
 func masterEvent(cal *goical.Calendar) *goical.Component {

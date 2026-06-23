@@ -293,6 +293,14 @@ func (b *Backend) DeleteCalendarObject(ctx context.Context, path string) error {
 	if err != nil {
 		return err
 	}
+	// Send CANCEL to attendees before removing a scheduled event.
+	if b.sched != nil {
+		if obj, oerr := b.db.ObjectByHref(ctx, cal.ID, p.object); oerr == nil && obj.HasScheduling {
+			if authed, aerr := authedUser(ctx); aerr == nil {
+				_ = b.sched.OnDelete(ctx, obj, authed)
+			}
+		}
+	}
 	if err := b.db.DeleteObject(ctx, cal.ID, p.object); err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			return webdav.NewHTTPError(http.StatusNotFound, err)
