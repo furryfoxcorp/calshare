@@ -8,9 +8,11 @@ docs/
 /dist/
 *.exe
 
-# giftwrap output
+# giftwrap output (runs relative to .github/giftwrap.yml)
 /_build/
 /_dist/
+/.github/_build/
+/.github/_dist/
 
 # Local database and runtime state
 *.sqlite

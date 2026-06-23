@@ -3,6 +3,8 @@ name: Release
 # Build cross-platform release archives with giftwrap when a version tag is
 # pushed (for example v0.1.0), and attach them to a GitHub Release. giftwrap
 # reads the version from the tag, so the checkout needs full history/tags.
+# giftwrap runs relative to .github/giftwrap.yml, so its output lands in
+# .github/_dist.
 on:
   push:
     tags:
@@ -15,10 +17,10 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: "1.26"
           cache: true
@@ -27,5 +29,5 @@ jobs:
       - name: Publish to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: _dist/*
+          files: .github/_dist/*
           generate_release_notes: true

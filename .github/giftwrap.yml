@@ -10,9 +10,10 @@ nameTemplate: "{{.Name}}-{{.Version}}-{{.OS}}-{{.Arch}}"
 env:
   CGO_ENABLED: "0"
 
-include:
-  - LICENSE
-  - README.md
+# Output archives go under .github/_dist (giftwrap runs relative to this file).
+# Archives are binary-only; the LICENSE and README live in the repo and the
+# GitHub Release notes.
+distPath: _dist
 
 targets:
   default:
