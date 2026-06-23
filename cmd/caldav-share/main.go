@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/furryfoxcorp/calshare/internal/config"
 	"github.com/furryfoxcorp/calshare/internal/version"
 	"github.com/spf13/cobra"
 )
@@ -47,35 +48,11 @@ func newVersionCmd() *cobra.Command {
 	}
 }
 
-func newServeCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "serve",
-		Short: "Run the HTTP server",
-		Args:  cobra.NoArgs,
-		RunE: func(*cobra.Command, []string) error {
-			return fmt.Errorf("serve is not wired up yet")
-		},
+// loadConfig reads configuration using the --config flag, if set.
+func loadConfig(cmd *cobra.Command) (*config.Config, error) {
+	flags := map[string]string{}
+	if v, _ := cmd.Flags().GetString("config"); v != "" {
+		flags["config"] = v
 	}
-}
-
-func newMigrateCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "migrate",
-		Short: "Apply pending database migrations",
-		Args:  cobra.NoArgs,
-		RunE: func(*cobra.Command, []string) error {
-			return fmt.Errorf("migrate is not wired up yet")
-		},
-	}
-}
-
-func newDoctorCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "doctor",
-		Short: "Check configuration and dependencies",
-		Args:  cobra.NoArgs,
-		RunE: func(*cobra.Command, []string) error {
-			return fmt.Errorf("doctor is not wired up yet")
-		},
-	}
+	return config.Load(flags)
 }
