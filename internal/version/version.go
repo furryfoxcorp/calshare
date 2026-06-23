@@ -2,5 +2,5 @@
 package version
 
 // Version is the current build version. Override at link time with
-// -ldflags "-X github.com/slowestnetwork/caldav-share/internal/version.Version=..."
+// -ldflags "-X github.com/furryfoxcorp/calshare/internal/version.Version=..."
 var Version = "0.1.0-dev"

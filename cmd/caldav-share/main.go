@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/slowestnetwork/caldav-share/internal/version"
+	"github.com/furryfoxcorp/calshare/internal/version"
 	"github.com/spf13/cobra"
 )
 
