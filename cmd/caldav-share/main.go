@@ -29,6 +29,8 @@ func main() {
 		newMigrateCmd(),
 		newDoctorCmd(),
 		newIMIPCmd(),
+		newAdminCmd(),
+		newTokenCmd(),
 	)
 
 	if err := root.Execute(); err != nil {

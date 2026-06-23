@@ -145,6 +145,24 @@ func (db *DB) TokensForView(ctx context.Context, viewID int64) ([]ShareToken, er
 	return out, rows.Err()
 }
 
+// ListAllShareTokens lists every token across all views (for the CLI).
+func (db *DB) ListAllShareTokens(ctx context.Context) ([]ShareToken, error) {
+	rows, err := db.QueryContext(ctx, "SELECT "+shareTokenCols+" FROM share_tokens ORDER BY id")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []ShareToken
+	for rows.Next() {
+		s, err := scanShareToken(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, *s)
+	}
+	return out, rows.Err()
+}
+
 // RevokeShareToken marks a token revoked.
 func (db *DB) RevokeShareToken(ctx context.Context, id int64) error {
 	res, err := db.ExecContext(ctx, "UPDATE share_tokens SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL", nowUTC(), id)

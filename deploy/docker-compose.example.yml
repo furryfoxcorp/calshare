@@ -1,0 +1,62 @@
+# Example deployment: calshare behind nginx with TLS.
+# Copy this to docker-compose.yml, fill in the env values, and run:
+#   docker compose up -d
+services:
+  caldav-share:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    # Or use a published image once you have one:
+    # image: ghcr.io/furryfoxcorp/calshare:latest
+    restart: unless-stopped
+    volumes:
+      - calshare-data:/data
+    environment:
+      # The public URL nginx serves. Required.
+      CALDAV_EXTERNAL_URL: "https://vulpes.calshare.fyi"
+
+      # OIDC single sign-on for the web UI. Required.
+      CALDAV_OIDC_ISSUER: "https://your-sso.example/realms/main"
+      CALDAV_OIDC_CLIENT_ID: "calshare"
+      CALDAV_OIDC_CLIENT_SECRET: "change-me"
+      # First login with one of these emails becomes an admin.
+      CALDAV_OIDC_ADMIN_EMAILS: "you@example.com"
+
+      # Outbound invitations (optional). Without these, external guests are
+      # queued but never emailed.
+      # CALDAV_SMTP_HOST: "smtp.example"
+      # CALDAV_SMTP_PORT: "587"
+      # CALDAV_SMTP_USER: "calshare@example.com"
+      # CALDAV_SMTP_PASS: "change-me"
+      # CALDAV_SMTP_TLS: "starttls"
+      # CALDAV_IMIP_REPLY_ADDRESS: "calendar-replies@example.com"
+
+      # Collect replies from external guests (optional).
+      # CALDAV_IMAP_HOST: "imap.example"
+      # CALDAV_IMAP_USER: "calendar-replies@example.com"
+      # CALDAV_IMAP_PASS: "change-me"
+      # CALDAV_IMAP_TLS: "implicit"
+
+      # Session and data-encryption keys persist in the database when unset,
+      # so a redeploy without these does not log everyone out. Set them to
+      # pin the keys across fresh volumes.
+      # CALDAV_SESSION_KEY: "a-long-random-string"
+      # CALDAV_DATA_KEY: "another-long-random-string"
+    expose:
+      - "8080"
+
+  nginx:
+    image: nginx:stable
+    restart: unless-stopped
+    depends_on:
+      - caldav-share
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/calendar.conf:/etc/nginx/conf.d/calendar.conf:ro
+      # Mount your TLS certificates where calendar.conf expects them.
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+
+volumes:
+  calshare-data:
