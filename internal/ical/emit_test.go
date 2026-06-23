@@ -119,3 +119,31 @@ func countVTIMEZONE(o *Object) int {
 	}
 	return n
 }
+
+func TestEmitFoldsLongLines(t *testing.T) {
+	longDesc := strings.Repeat("A", 600)
+	body := "BEGIN:VEVENT\r\nUID:fold-1\r\nDTSTAMP:20260101T000000Z\r\nDTSTART:20260105T090000Z\r\nDESCRIPTION:" + longDesc + "\r\nSUMMARY:Folded\r\nEND:VEVENT\r\n"
+	obj, err := Parse(wrap(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := Emit(obj.Cal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Every physical line must be <= 75 octets.
+	for _, line := range strings.Split(string(out), "\r\n") {
+		if len(line) > 75 {
+			t.Fatalf("unfolded line of %d octets: %.80q", len(line), line)
+		}
+	}
+	// Continuation lines (starting with a space) must exist for the long prop.
+	if !strings.Contains(string(out), "\r\n ") {
+		t.Error("no fold continuation produced")
+	}
+	// Unfolding (remove CRLF+space) must restore the original description.
+	unfolded := strings.ReplaceAll(string(out), "\r\n ", "")
+	if !strings.Contains(unfolded, "DESCRIPTION:"+longDesc) {
+		t.Error("folding was not reversible")
+	}
+}

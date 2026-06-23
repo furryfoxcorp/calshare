@@ -109,27 +109,29 @@ func vtimezoneFor(name string) (*goical.Component, error) {
 		return vtz, nil
 	}
 
-	// Use the most recent transition into each of DAYLIGHT and STANDARD as a
-	// representative rule. This matches what clients need for current and
-	// near-future events.
-	var latestStd, latestDst *transition
+	// Use the EARLIEST transition into each of DAYLIGHT and STANDARD as the
+	// representative rule, so its DTSTART sits in the past and the yearly RRULE
+	// covers current and future event dates. Anchoring on the latest transition
+	// would leave events before that date with no resolvable offset, which
+	// strict clients (Apple Calendar) reject.
+	var earliestStd, earliestDst *transition
 	for i := range transitions {
 		t := &transitions[i]
 		if t.isDST {
-			if latestDst == nil || t.at.After(latestDst.at) {
-				latestDst = t
+			if earliestDst == nil || t.at.Before(earliestDst.at) {
+				earliestDst = t
 			}
 		} else {
-			if latestStd == nil || t.at.After(latestStd.at) {
-				latestStd = t
+			if earliestStd == nil || t.at.Before(earliestStd.at) {
+				earliestStd = t
 			}
 		}
 	}
-	if latestStd != nil {
-		vtz.Children = append(vtz.Children, subcomponent("STANDARD", latestStd, loc))
+	if earliestStd != nil {
+		vtz.Children = append(vtz.Children, subcomponent("STANDARD", earliestStd, loc))
 	}
-	if latestDst != nil {
-		vtz.Children = append(vtz.Children, subcomponent("DAYLIGHT", latestDst, loc))
+	if earliestDst != nil {
+		vtz.Children = append(vtz.Children, subcomponent("DAYLIGHT", earliestDst, loc))
 	}
 	vtzCache[name] = vtz
 	return vtz, nil
@@ -146,8 +148,11 @@ type transition struct {
 // detectTransitions samples a window around the present and binary-searches for
 // offset changes, returning the transitions found.
 func detectTransitions(loc *time.Location) []transition {
-	from := time.Date(time.Now().UTC().Year()-2, 1, 1, 0, 0, 0, 0, time.UTC)
-	to := from.AddDate(5, 0, 0)
+	// Scan several years back so the earliest detected transition (used as the
+	// rule's DTSTART anchor) precedes typical event dates, and a few years
+	// forward to capture the current rule.
+	from := time.Date(time.Now().UTC().Year()-6, 1, 1, 0, 0, 0, 0, time.UTC)
+	to := from.AddDate(9, 0, 0)
 
 	step := 6 * time.Hour
 	var out []transition
