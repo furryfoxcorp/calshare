@@ -25,7 +25,10 @@ func (r Range) Contains(t time.Time) bool {
 // "FREQ=WEEKLY;COUNT=5"), and exdates lists instants to exclude. The result
 // is sorted ascending.
 func ExpandRRULE(dtstart time.Time, rruleProp string, exdates []time.Time, window Range) ([]time.Time, error) {
-	opt, err := rrule.StrToROption(rruleProp)
+	// Parse in the series' own location so a floating UNTIL (one without a
+	// trailing Z, which real clients emit for zoned events) resolves in that
+	// zone rather than UTC, which would clip the last occurrences.
+	opt, err := rrule.StrToROptionInLocation(rruleProp, dtstart.Location())
 	if err != nil {
 		return nil, err
 	}

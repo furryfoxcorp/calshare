@@ -75,3 +75,21 @@ func TestExpandAcrossDSTKeepsWallClock(t *testing.T) {
 		}
 	}
 }
+
+func TestFloatingUntilResolvesInSeriesZone(t *testing.T) {
+	ny, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := time.Date(2026, 1, 5, 9, 0, 0, 0, ny) // Mon 9am NY
+	window := Range{Start: start.Add(-time.Hour), End: start.AddDate(0, 0, 60)}
+	// Floating UNTIL (no Z) on the third occurrence's day. If parsed as UTC,
+	// 09:00 UTC is before 09:00 NY (14:00 UTC), clipping the Jan 19 instance.
+	occ, err := ExpandRRULE(start, "FREQ=WEEKLY;UNTIL=20260119T090000", nil, window)
+	if err != nil {
+		t.Fatalf("ExpandRRULE: %v", err)
+	}
+	if len(occ) != 3 {
+		t.Fatalf("got %d occurrences, want 3 (Jan 5, 12, 19); floating UNTIL resolved in wrong zone", len(occ))
+	}
+}

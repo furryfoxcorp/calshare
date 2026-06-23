@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 
 	goical "github.com/emersion/go-ical"
 	"github.com/emersion/go-webdav"
@@ -135,6 +136,10 @@ func (b *Backend) CreateCalendar(ctx context.Context, cal *caldav.Calendar) erro
 		return err
 	}
 	p := b.parsePath(cal.Path)
+	// A user may only create calendars under their own principal.
+	if !strings.EqualFold(p.email, u.Email) {
+		return webdav.NewHTTPError(http.StatusForbidden, errors.New("cannot create a calendar under another principal"))
+	}
 	supportsVTODO := false
 	for _, comp := range cal.SupportedComponentSet {
 		if comp == ical.CompTodo {
@@ -272,13 +277,18 @@ func (b *Backend) PutCalendarObject(ctx context.Context, path string, cal *goica
 	}
 
 	existing, getErr := b.db.ObjectByHref(ctx, calRow.ID, p.object)
+	// A lookup error other than "not found" is a real failure, not an absence.
+	if getErr != nil && !errors.Is(getErr, storage.ErrNotFound) {
+		return nil, getErr
+	}
+	exists := getErr == nil
 	switch {
 	case opts != nil && opts.IfNoneMatch.IsSet():
-		if getErr == nil {
+		if exists {
 			return nil, webdav.NewHTTPError(http.StatusPreconditionFailed, errors.New("resource exists"))
 		}
 	case opts != nil && opts.IfMatch.IsSet():
-		if getErr != nil {
+		if !exists {
 			return nil, webdav.NewHTTPError(http.StatusPreconditionFailed, errors.New("resource does not exist"))
 		}
 		ok, err := opts.IfMatch.MatchETag(existing.ETag)

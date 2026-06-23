@@ -171,10 +171,19 @@ func (s *Server) handleFreeBusy(w http.ResponseWriter, r *http.Request, body []b
 		dur := obj.Duration()
 		for _, st := range occ {
 			en := st.Add(dur)
-			if en.Before(start) || st.After(end) {
+			// Clamp each busy period to the requested window so we never report
+			// busy time outside [start, end].
+			cs, ce := st, en
+			if cs.Before(start) {
+				cs = start
+			}
+			if ce.After(end) {
+				ce = end
+			}
+			if !ce.After(cs) {
 				continue
 			}
-			periods = append(periods, fmt.Sprintf("%s/%s", utcStamp(st), utcStamp(en)))
+			periods = append(periods, fmt.Sprintf("%s/%s", utcStamp(cs), utcStamp(ce)))
 		}
 	}
 
@@ -197,11 +206,17 @@ func (s *Server) handleFreeBusy(w http.ResponseWriter, r *http.Request, body []b
 // handlePrincipalSearch answers DAV:principal-property-search with the
 // matching local users as principals.
 func (s *Server) handlePrincipalSearch(w http.ResponseWriter, r *http.Request, body []byte) {
-	query := principalSearchMatch(body)
-	users, err := s.db.SearchUsers(r.Context(), query)
-	if err != nil {
-		http.Error(w, "error", http.StatusInternalServerError)
-		return
+	query := strings.TrimSpace(principalSearchMatch(body))
+	// Require a search term so this cannot be used to enumerate the whole user
+	// directory; an empty query returns an empty result set.
+	var users []storage.User
+	if query != "" {
+		var err error
+		users, err = s.db.SearchUsers(r.Context(), query)
+		if err != nil {
+			http.Error(w, "error", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	var b strings.Builder

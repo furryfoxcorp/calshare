@@ -296,3 +296,24 @@ func TestPrincipalPropfindHasSchedulingProps(t *testing.T) {
 		}
 	}
 }
+
+func TestPrincipalSearchEmptyReturnsNoUsers(t *testing.T) {
+	f := newFixture(t)
+	// A search with no <match> term must not enumerate the directory.
+	report := `<?xml version="1.0"?><D:principal-property-search xmlns:D="DAV:"><D:property-search><D:prop><D:displayname/></D:prop><D:match></D:match></D:property-search><D:prop><D:displayname/></D:prop></D:principal-property-search>`
+	res := f.do(t, "REPORT", "/dav/", report, map[string]string{"Content-Type": "application/xml"})
+	got := body(t, res)
+	if strings.Contains(got, "/dav/"+testEmail+"/") {
+		t.Errorf("empty principal-search should not return users:\n%s", got)
+	}
+}
+
+func TestMkcolForeignPrincipalForbidden(t *testing.T) {
+	f := newFixture(t)
+	// go-webdav creates calendars via MKCOL with a calendar resourcetype.
+	body := `<?xml version="1.0"?><D:mkcol xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav"><D:set><D:prop><D:resourcetype><D:collection/><C:calendar/></D:resourcetype><D:displayname>X</D:displayname></D:prop></D:set></D:mkcol>`
+	res := f.do(t, "MKCOL", "/dav/someoneelse@example.com/calendars/newcal", body, map[string]string{"Content-Type": "application/xml"})
+	if res.StatusCode != http.StatusForbidden {
+		t.Fatalf("MKCOL under another principal = %d, want 403", res.StatusCode)
+	}
+}

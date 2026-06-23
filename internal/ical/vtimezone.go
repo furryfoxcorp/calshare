@@ -208,7 +208,6 @@ func isDSTAt(loc *time.Location, t time.Time) bool {
 // derived from the transition date.
 func subcomponent(kind string, tr *transition, loc *time.Location) *goical.Component {
 	c := goical.NewComponent(kind)
-	local := tr.at.In(loc)
 	// DTSTART in a VTIMEZONE subcomponent is wall-clock local time in the
 	// offset that was in effect just before the change (offsetFrom).
 	beforeLocal := tr.at.Add(-time.Second).In(time.FixedZone("", tr.offsetFrom)).Add(time.Second)
@@ -218,7 +217,9 @@ func subcomponent(kind string, tr *transition, loc *time.Location) *goical.Compo
 	if tr.name != "" {
 		c.Props.SetText("TZNAME", tr.name)
 	}
-	setRaw(c, "RRULE", yearlyRule(local))
+	// The yearly recurrence must describe the same wall-clock date as DTSTART,
+	// so derive its month/weekday from beforeLocal, not the post-change instant.
+	setRaw(c, "RRULE", yearlyRule(beforeLocal))
 	return c
 }
 

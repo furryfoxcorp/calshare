@@ -1,6 +1,7 @@
 package caldav
 
 import (
+	"net/url"
 	"path"
 	"strings"
 )
@@ -9,29 +10,33 @@ import (
 // user's calendar collections.
 const homeSetName = "calendars"
 
+// seg URL-escapes one path segment. For ordinary emails and slugs this is a
+// no-op, but it keeps hrefs valid for addresses with unusual characters.
+func seg(s string) string { return url.PathEscape(s) }
+
 // principalPath returns the user principal URL, for example
 // "/dav/owner@example.com/".
 func (b *Backend) principalPath(email string) string {
-	return b.prefix + "/" + email + "/"
+	return b.prefix + "/" + seg(email) + "/"
 }
 
 // homeSetPath returns the calendar home set URL, for example
 // "/dav/owner@example.com/calendars/".
 func (b *Backend) homeSetPath(email string) string {
-	return b.prefix + "/" + email + "/" + homeSetName + "/"
+	return b.prefix + "/" + seg(email) + "/" + homeSetName + "/"
 }
 
 // calendarPath returns a calendar collection URL (no trailing slash, matching
 // go-webdav's convention), for example
 // "/dav/owner@example.com/calendars/<slug>".
 func (b *Backend) calendarPath(email, slug string) string {
-	return b.prefix + "/" + email + "/" + homeSetName + "/" + slug
+	return b.prefix + "/" + seg(email) + "/" + homeSetName + "/" + seg(slug)
 }
 
 // objectPath returns a calendar object URL, for example
 // "/dav/owner@example.com/calendars/<slug>/<name>".
 func (b *Backend) objectPath(email, slug, name string) string {
-	return b.calendarPath(email, slug) + "/" + name
+	return b.calendarPath(email, slug) + "/" + seg(name)
 }
 
 // parsed holds the components extracted from a request path.
