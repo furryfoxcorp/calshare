@@ -89,7 +89,13 @@ func (s *Server) viewDetailData(r *http.Request, v *storage.View) viewDetailData
 	for _, vc := range vcs {
 		selected[vc.CalendarID] = true
 	}
-	tokens, _ := s.db.TokensForView(ctx, v.ID)
+	all, _ := s.db.TokensForView(ctx, v.ID)
+	tokens := make([]storage.ShareToken, 0, len(all))
+	for _, t := range all {
+		if t.RevokedAt == nil {
+			tokens = append(tokens, t)
+		}
+	}
 	return viewDetailData{View: v, Calendars: cals, Selected: selected, Tokens: tokens}
 }
 

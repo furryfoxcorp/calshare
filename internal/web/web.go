@@ -29,6 +29,7 @@ type Server struct {
 	auth        *oidc.Authenticator // may be nil if OIDC is not yet reachable
 	audit       *audit.Logger
 	sched       *scheduling.Scheduler
+	dev         *devLogin
 	dataKey     []byte
 	externalURL string
 	pages       map[string]*template.Template
@@ -98,6 +99,9 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /oidc/login", s.handleOIDCLogin)
 	mux.HandleFunc("GET /oidc/callback", s.handleOIDCCallback)
 	mux.HandleFunc("POST /logout", s.handleLogout)
+	if s.dev != nil {
+		mux.HandleFunc("POST /dev-login", s.handleDevLogin)
+	}
 
 	// Authenticated app routes.
 	app := http.NewServeMux()

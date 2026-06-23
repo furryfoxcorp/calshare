@@ -331,12 +331,12 @@ func TestRevokeTokenReflectedInList(t *testing.T) {
 		t.Fatalf("status = %d", rec.Code)
 	}
 	out := rec.Body.String()
-	if !strings.Contains(out, "Revoked") {
-		t.Errorf("revoked token not marked in list:\n%s", out)
-	}
-	// The revoke button for that token should be gone.
+	// A revoked token disappears from the list entirely.
 	if strings.Contains(out, "/tokens/"+itoa(id)+"/revoke") {
-		t.Error("revoke button still present for a revoked token")
+		t.Errorf("revoked token still shown in list:\n%s", out)
+	}
+	if !strings.Contains(out, "No share links yet") {
+		t.Errorf("expected empty list after revoking the only token:\n%s", out)
 	}
 	tok, _ := h.db.TokensForView(ctx, v.ID)
 	if tok[0].RevokedAt == nil {

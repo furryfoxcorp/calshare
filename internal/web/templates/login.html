@@ -18,6 +18,14 @@
       {{if .Error}}<div class="flash">{{.Error}}</div>{{end}}
       <p>Sign in with your account to manage calendars, devices, and shared views.</p>
       <a class="btn" href="/oidc/login">Sign in with SSO</a>
+      {{if .DevLogin}}
+      <form method="post" action="/dev-login" style="margin-top:18px;text-align:left">
+        <p class="group-label">Development sign-in</p>
+        <div class="field"><label for="email">Email</label><input type="text" id="email" name="email" value="dev@localhost"></div>
+        <div class="field"><label for="password">Dev password</label><input type="password" id="password" name="password"></div>
+        <div class="actions"><button class="btn btn-secondary" type="submit">Sign in (dev)</button></div>
+      </form>
+      {{end}}
     </div>
   </div>
 </div>

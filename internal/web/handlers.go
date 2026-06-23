@@ -11,8 +11,11 @@ import (
 )
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
-	data := struct{ Error string }{}
-	if s.auth == nil {
+	data := struct {
+		Error    string
+		DevLogin bool
+	}{DevLogin: s.dev != nil}
+	if s.auth == nil && s.dev == nil {
 		data.Error = "Single sign-on is not configured yet. Check the server settings."
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
