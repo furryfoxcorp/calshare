@@ -1,0 +1,26 @@
+{{define "title"}}Profile - calshare{{end}}
+{{define "content"}}
+<h2>Profile</h2>
+<p class="sub">Signed in as {{.User.Email}}.</p>
+
+<section>
+  <p class="group-label">Display time zone</p>
+  <form method="post" action="/profile">
+    <div class="field">
+      <label for="display_tz">Time zone</label>
+      <select id="display_tz" name="display_tz">
+        {{range .Data.Zones}}<option value="{{.}}" {{if eq . $.User.DisplayTZ}}selected{{end}}>{{.}}</option>{{end}}
+      </select>
+      <div class="hint">Used to show times in the web UI.</div>
+    </div>
+    <div class="actions"><button class="btn" type="submit">Save</button></div>
+  </form>
+</section>
+
+<section>
+  <p class="group-label">Session</p>
+  <form method="post" action="/logout">
+    <div class="actions"><button class="btn btn-secondary" type="submit">Sign out</button></div>
+  </form>
+</section>
+{{end}}

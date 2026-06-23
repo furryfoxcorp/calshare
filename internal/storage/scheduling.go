@@ -254,6 +254,37 @@ func (db *DB) MarkIMIPFinal(ctx context.Context, id int64, errStr string) error 
 	return err
 }
 
+// RecentIMIP returns the most recent outbound queue rows for the admin view.
+func (db *DB) RecentIMIP(ctx context.Context, limit int) ([]IMIPMessage, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	rows, err := db.QueryContext(ctx, `
+		SELECT id, object_id, from_user_id, to_address, itip_method, message_id,
+			in_reply_to, uid, body_blob, status, attempt_count
+		FROM imip_outbound_queue ORDER BY id DESC LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []IMIPMessage
+	for rows.Next() {
+		var m IMIPMessage
+		var objID sql.NullInt64
+		var inReply sql.NullString
+		if err := rows.Scan(&m.ID, &objID, &m.FromUserID, &m.ToAddress, &m.Method,
+			&m.MessageID, &inReply, &m.UID, &m.Body, &m.Status, &m.AttemptCount); err != nil {
+			return nil, err
+		}
+		if objID.Valid {
+			m.ObjectID = &objID.Int64
+		}
+		m.InReplyTo = inReply.String
+		out = append(out, m)
+	}
+	return out, rows.Err()
+}
+
 // IMIPProcessed reports whether an inbound Message-ID was already handled.
 func (db *DB) IMIPProcessed(ctx context.Context, messageID string) (bool, error) {
 	var n int

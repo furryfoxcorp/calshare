@@ -20,11 +20,12 @@
       <a href="/calendars" class="{{if eq .Active "calendars"}}active{{end}}">Calendars</a>
       <a href="/sources" class="{{if eq .Active "sources"}}active{{end}}">Subscriptions</a>
       <a href="/views" class="{{if eq .Active "views"}}active{{end}}">Views</a>
+      <a href="/inbox" class="{{if eq .Active "inbox"}}active{{end}}">Inbox</a>
       <a href="/devices" class="{{if eq .Active "devices"}}active{{end}}">Devices</a>
       {{if .User.IsAdmin}}<a href="/admin" class="{{if eq .Active "admin"}}active{{end}}">Admin</a>{{end}}
     </nav>
     <span class="spacer"></span>
-    <span class="who">{{.User.DisplayName}}</span>
+    <a href="/profile" class="who">{{.User.DisplayName}}</a>
     <form method="post" action="/logout" style="margin:0 0 0 8px">
       <button class="btn btn-secondary btn-sm" type="submit">Sign out</button>
     </form>

@@ -12,6 +12,7 @@ import (
 
 	"github.com/furryfoxcorp/calshare/internal/audit"
 	"github.com/furryfoxcorp/calshare/internal/oidc"
+	"github.com/furryfoxcorp/calshare/internal/scheduling"
 	"github.com/furryfoxcorp/calshare/internal/storage"
 )
 
@@ -27,6 +28,7 @@ type Server struct {
 	sessions    *oidc.Manager
 	auth        *oidc.Authenticator // may be nil if OIDC is not yet reachable
 	audit       *audit.Logger
+	sched       *scheduling.Scheduler
 	dataKey     []byte
 	externalURL string
 	pages       map[string]*template.Template
@@ -36,17 +38,26 @@ type Server struct {
 
 // NewServer builds the web server. auth may be nil; when nil the login page
 // explains that SSO is unavailable. audit may be nil to skip audit logging.
-func NewServer(db *storage.DB, sessions *oidc.Manager, auth *oidc.Authenticator, audlog *audit.Logger, dataKey []byte, externalURL string) *Server {
-	funcs := template.FuncMap{"date": fmtDate}
+func NewServer(db *storage.DB, sessions *oidc.Manager, auth *oidc.Authenticator, audlog *audit.Logger, sched *scheduling.Scheduler, dataKey []byte, externalURL string) *Server {
+	funcs := template.FuncMap{
+		"date": fmtDate,
+		"div":  func(a, b int) int { if b == 0 { return 0 }; return a / b },
+	}
 
 	pageFiles := map[string]string{
-		"dashboard":   "dashboard.html",
-		"devices":     "devices.html",
-		"calendars":   "calendars.html",
-		"views":       "views.html",
-		"view_detail": "view_detail.html",
-		"sources":     "sources.html",
-		"placeholder": "placeholder.html",
+		"dashboard":       "dashboard.html",
+		"devices":         "devices.html",
+		"calendars":       "calendars.html",
+		"calendar_detail": "calendar_detail.html",
+		"tasks":           "tasks.html",
+		"views":           "views.html",
+		"view_detail":     "view_detail.html",
+		"sources":         "sources.html",
+		"inbox":           "inbox.html",
+		"event_detail":    "event_detail.html",
+		"profile":         "profile.html",
+		"admin":           "admin.html",
+		"placeholder":     "placeholder.html",
 	}
 	pages := map[string]*template.Template{}
 	for name, file := range pageFiles {
@@ -60,6 +71,7 @@ func NewServer(db *storage.DB, sessions *oidc.Manager, auth *oidc.Authenticator,
 		sessions:    sessions,
 		auth:        auth,
 		audit:       audlog,
+		sched:       sched,
 		dataKey:     dataKey,
 		externalURL: externalURL,
 		pages:       pages,
@@ -92,7 +104,18 @@ func (s *Server) Register(mux *http.ServeMux) {
 	app.HandleFunc("GET /{$}", s.handleDashboard)
 	app.HandleFunc("GET /calendars", s.handleCalendars)
 	app.HandleFunc("POST /calendars", s.handleCreateCalendar)
+	app.HandleFunc("GET /calendars/{id}", s.handleCalendarDetail)
+	app.HandleFunc("POST /calendars/{id}", s.handleUpdateCalendar)
+	app.HandleFunc("POST /calendars/{id}/share", s.handleShareCalendar)
+	app.HandleFunc("POST /calendars/{id}/unshare", s.handleUnshareCalendar)
+	app.HandleFunc("GET /calendars/{id}/tasks", s.handleTasks)
 	app.HandleFunc("POST /calendars/{id}/delete", s.handleDeleteCalendar)
+	app.HandleFunc("GET /inbox", s.handleInbox)
+	app.HandleFunc("POST /inbox/respond", s.handleInboxRespond)
+	app.HandleFunc("GET /events/{id}", s.handleEventDetail)
+	app.HandleFunc("POST /events/{id}/resend", s.handleResendInvite)
+	app.HandleFunc("GET /profile", s.handleProfile)
+	app.HandleFunc("POST /profile", s.handleUpdateProfile)
 	app.HandleFunc("GET /devices", s.handleDevices)
 	app.HandleFunc("POST /devices", s.handleCreateDevice)
 	app.HandleFunc("POST /devices/{id}/revoke", s.handleRevokeDevice)
@@ -106,7 +129,8 @@ func (s *Server) Register(mux *http.ServeMux) {
 	app.HandleFunc("POST /views/{id}/calendars", s.handleToggleViewCalendar)
 	app.HandleFunc("POST /views/{id}/tokens", s.handleCreateToken)
 	app.HandleFunc("POST /tokens/{id}/revoke", s.handleRevokeToken)
-	app.HandleFunc("GET /admin", s.placeholder("Admin", "Users, audit log, and system status."))
+	app.HandleFunc("POST /genpw", s.handleGenPassword)
+	app.HandleFunc("GET /admin", s.handleAdmin)
 
 	mux.Handle("/", s.sessions.RequireUser(app))
 }

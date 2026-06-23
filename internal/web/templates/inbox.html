@@ -1,0 +1,30 @@
+{{define "title"}}Inbox - calshare{{end}}
+{{define "content"}}
+<h2>Inbox</h2>
+<p class="sub">Invitations and replies waiting for you.</p>
+
+<div class="panel">
+  {{if .Data.Items}}
+    {{range .Data.Items}}
+    <div class="row">
+      <span class="grow"><span class="title">{{if eq .Method "REQUEST"}}Invitation{{else if eq .Method "REPLY"}}Reply{{else if eq .Method "CANCEL"}}Cancellation{{else}}{{.Method}}{{end}}</span>
+        <div class="meta">{{.UID}}{{if .OriginEmail}} &middot; from {{.OriginEmail}}{{end}} &middot; {{date .CreatedAt}}</div>
+      </span>
+      <form method="post" action="/inbox/respond" style="margin:0;display:flex;gap:6px">
+        <input type="hidden" name="href" value="{{.Href}}">
+        <input type="hidden" name="uid" value="{{.UID}}">
+        {{if eq .Method "REQUEST"}}
+          <button class="btn btn-sm" name="action" value="accept" type="submit">Accept</button>
+          <button class="btn btn-secondary btn-sm" name="action" value="tentative" type="submit">Maybe</button>
+          <button class="btn btn-danger btn-sm" name="action" value="decline" type="submit">Decline</button>
+        {{else}}
+          <button class="btn btn-secondary btn-sm" name="action" value="dismiss" type="submit">Dismiss</button>
+        {{end}}
+      </form>
+    </div>
+    {{end}}
+  {{else}}
+    <div class="empty">Nothing in your inbox.</div>
+  {{end}}
+</div>
+{{end}}

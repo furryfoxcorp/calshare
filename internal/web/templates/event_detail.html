@@ -1,0 +1,25 @@
+{{define "title"}}{{.Data.Summary}} - calshare{{end}}
+{{define "content"}}
+<h2>{{if .Data.Summary}}{{.Data.Summary}}{{else}}Event{{end}}</h2>
+<p class="sub">{{.Data.Object.UID}}</p>
+
+<section>
+  <p class="group-label">Attendees</p>
+  <div class="panel">
+    {{if .Data.Attendees}}
+      {{range .Data.Attendees}}
+      <div class="row">
+        <span class="grow"><span class="title">{{if .CN}}{{.CN}}{{else}}{{.Email}}{{end}}</span>
+          <div class="meta">{{.Email}} &middot; {{.Partstat}}{{if .IsLocalUser}} &middot; local{{end}} &middot; updated {{date .LastUpdatedAt}}</div>
+        </span>
+      </div>
+      {{end}}
+    {{else}}
+      <div class="empty">No attendees on this event.</div>
+    {{end}}
+  </div>
+  <form method="post" action="/events/{{.Data.Object.ID}}/resend" style="margin-top:14px">
+    <div class="actions"><button class="btn btn-secondary" type="submit">Resend invitations</button></div>
+  </form>
+</section>
+{{end}}

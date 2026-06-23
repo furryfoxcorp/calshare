@@ -176,6 +176,11 @@ func (db *DB) ObjectByUID(ctx context.Context, calendarID int64, uid string) (*O
 		"SELECT "+objCols+" FROM objects WHERE calendar_id = ? AND uid = ?", calendarID, uid))
 }
 
+// ObjectByID returns one object by primary key.
+func (db *DB) ObjectByID(ctx context.Context, id int64) (*Object, error) {
+	return scanObject(db.QueryRowContext(ctx, "SELECT "+objCols+" FROM objects WHERE id = ?", id))
+}
+
 // ObjectByUIDAny returns the first object with a given UID across all
 // calendars, used to match an inbound iMIP reply to its originating event.
 func (db *DB) ObjectByUIDAny(ctx context.Context, uid string) (*Object, error) {

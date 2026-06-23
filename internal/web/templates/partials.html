@@ -86,6 +86,7 @@
     <span class="grow"><span class="title">{{.DisplayName}}</span>
       <div class="meta">{{if eq .SourceType "ics"}}Subscribed feed{{else}}Local calendar{{end}}{{if .SupportsVTODO}} &middot; tasks on{{end}}</div>
     </span>
+    <a class="btn btn-secondary btn-sm" href="/calendars/{{.ID}}">Open</a>
     <button class="btn btn-danger btn-sm"
       hx-post="/calendars/{{.ID}}/delete"
       hx-target="#calendar-list" hx-swap="innerHTML"

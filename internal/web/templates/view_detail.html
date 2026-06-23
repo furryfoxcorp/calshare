@@ -79,7 +79,11 @@
     </div>
     <div class="field">
       <label for="password">Password (optional)</label>
-      <input type="text" id="password" name="password" placeholder="leave blank for no password">
+      <div style="display:flex;gap:6px;align-items:center">
+        <input type="text" id="password" name="password" placeholder="leave blank for no password">
+        <button class="btn btn-secondary btn-sm" type="button"
+          hx-post="/genpw" hx-target="#password" hx-swap="outerHTML">Generate</button>
+      </div>
     </div>
     <div class="actions"><button class="btn" type="submit">Create link</button></div>
   </form>

@@ -1,0 +1,47 @@
+{{define "title"}}Admin - calshare{{end}}
+{{define "content"}}
+<h2>Admin</h2>
+<p class="sub">Users, recent activity, and the invitation queue.</p>
+
+<section>
+  <p class="group-label">Users</p>
+  <div class="panel">
+    {{range .Data.Users}}
+    <div class="row">
+      <span class="grow"><span class="title">{{.DisplayName}}</span><div class="meta">{{.Email}}{{if .IsAdmin}} &middot; admin{{end}}</div></span>
+      <span class="meta">joined {{date .CreatedAt}}</span>
+    </div>
+    {{end}}
+  </div>
+</section>
+
+<section>
+  <p class="group-label">Invitation queue</p>
+  <div class="panel">
+    {{if .Data.Queue}}
+      {{range .Data.Queue}}
+      <div class="row">
+        <span class="grow"><span class="title">{{.Method}} to {{.ToAddress}}</span><div class="meta">{{.Status}} &middot; attempts {{.AttemptCount}}</div></span>
+      </div>
+      {{end}}
+    {{else}}
+      <div class="empty">No outbound invitations.</div>
+    {{end}}
+  </div>
+</section>
+
+<section>
+  <p class="group-label">Recent activity</p>
+  <div class="panel">
+    {{if .Data.Audit}}
+      {{range .Data.Audit}}
+      <div class="row">
+        <span class="grow"><span class="title">{{.Event}}</span><div class="meta">{{.ActorKind}}{{if .ClientIP}} &middot; {{.ClientIP}}{{end}} &middot; {{date .TS}}</div></span>
+      </div>
+      {{end}}
+    {{else}}
+      <div class="empty">No activity recorded yet.</div>
+    {{end}}
+  </div>
+</section>
+{{end}}

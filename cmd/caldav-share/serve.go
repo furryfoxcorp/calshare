@@ -101,7 +101,7 @@ func runServe(cmd *cobra.Command) error {
 	mux := http.NewServeMux()
 	caldav.NewServer(db, "/dav", cfg.TrustProxyHeaders, sched).Register(mux)
 	share.NewServer(db).Register(mux)
-	web.NewServer(db, sessions, auth, audit.New(db, logger), dataKey, cfg.ExternalURL).Register(mux)
+	web.NewServer(db, sessions, auth, audit.New(db, logger), sched, dataKey, cfg.ExternalURL).Register(mux)
 
 	srv := &http.Server{
 		Addr:              cfg.ListenAddr,

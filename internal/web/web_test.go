@@ -37,7 +37,7 @@ func setup(t *testing.T) *harness {
 	key := []byte("0123456789abcdef0123456789abcdef")
 	sessions := oidc.NewManager(db, key, false)
 
-	srv := NewServer(db, sessions, nil, nil, nil, "https://vulpes.calshare.fyi")
+	srv := NewServer(db, sessions, nil, nil, nil, nil, "https://vulpes.calshare.fyi")
 	mux := http.NewServeMux()
 	srv.Register(mux)
 
@@ -241,5 +241,80 @@ func TestAddSource(t *testing.T) {
 	}
 	if !found {
 		t.Error("ICS calendar not created with expected fields")
+	}
+}
+
+func TestCalendarDetailAndShare(t *testing.T) {
+	h := setup(t)
+	cal, _ := h.db.CreateCalendar(context.Background(), &storage.Calendar{UserID: h.user.ID, DisplayName: "Home"})
+	grantee, _ := h.db.UpsertUserOnLogin(context.Background(), "z", "zoe@example.com", "Zoe")
+
+	detail := h.req(t, "GET", "/calendars/"+itoa(cal.ID), "")
+	if detail.Code != http.StatusOK {
+		t.Fatalf("detail status = %d", detail.Code)
+	}
+	if !strings.Contains(detail.Body.String(), "Shared with") {
+		t.Error("detail page missing sharing section")
+	}
+
+	share := h.req(t, "POST", "/calendars/"+itoa(cal.ID)+"/share", "email=zoe@example.com&privilege=read-write")
+	if share.Code != http.StatusSeeOther {
+		t.Fatalf("share status = %d", share.Code)
+	}
+	level, _ := h.db.AccessLevel(context.Background(), cal.ID, grantee.ID)
+	if level != storage.AccessReadWrite {
+		t.Errorf("grant level = %q, want read-write", level)
+	}
+}
+
+func TestGenPassword(t *testing.T) {
+	h := setup(t)
+	rec := h.req(t, "POST", "/genpw", "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), `id="password"`) || !strings.Contains(rec.Body.String(), "value=") {
+		t.Errorf("genpw did not return a filled input:\n%s", rec.Body.String())
+	}
+}
+
+func TestProfileUpdate(t *testing.T) {
+	h := setup(t)
+	rec := h.req(t, "POST", "/profile", "display_tz=Europe/London")
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	u, _ := h.db.UserByID(context.Background(), h.user.ID)
+	if u.DisplayTZ != "Europe/London" {
+		t.Errorf("display tz = %q, want Europe/London", u.DisplayTZ)
+	}
+}
+
+func TestInboxRenders(t *testing.T) {
+	h := setup(t)
+	if rec := h.req(t, "GET", "/inbox", ""); rec.Code != http.StatusOK {
+		t.Fatalf("inbox status = %d", rec.Code)
+	}
+}
+
+func TestAdminAccess(t *testing.T) {
+	h := setup(t)
+	// Non-admin is forbidden.
+	if rec := h.req(t, "GET", "/admin", ""); rec.Code != http.StatusForbidden {
+		t.Fatalf("non-admin admin status = %d, want 403", rec.Code)
+	}
+	// After promotion, a fresh session reflects the admin flag and the page renders.
+	h.db.SetAdmin(context.Background(), h.user.Email, true)
+	rec := httptest.NewRecorder()
+	sessions := oidc.NewManager(h.db, []byte("0123456789abcdef0123456789abcdef"), false)
+	sessions.StartSession(rec, httptest.NewRequest("GET", "/", nil), h.user.ID)
+	cookie := rec.Result().Cookies()[0]
+
+	req := httptest.NewRequest("GET", "/admin", nil)
+	req.AddCookie(cookie)
+	w := httptest.NewRecorder()
+	h.mux.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("admin (as admin) status = %d, want 200", w.Code)
 	}
 }

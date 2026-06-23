@@ -155,6 +155,16 @@ func (db *DB) RenameCalendar(ctx context.Context, id int64, name string) error {
 	return err
 }
 
+// UpdateCalendar saves editable calendar fields: display name, color, task
+// support, and (for ICS feeds) the poll interval in seconds.
+func (db *DB) UpdateCalendar(ctx context.Context, id int64, name, color string, supportsVTODO bool, pollInterval int) error {
+	_, err := db.ExecContext(ctx, `
+		UPDATE calendars SET display_name = ?, color = ?, supports_vtodo = ?, ics_poll_interval = ?
+		WHERE id = ?`,
+		name, nullString(color), boolToInt(supportsVTODO), nullInt(pollInterval), id)
+	return err
+}
+
 // DeleteCalendar removes a calendar and its objects (via cascade).
 func (db *DB) DeleteCalendar(ctx context.Context, id int64) error {
 	_, err := db.ExecContext(ctx, "DELETE FROM calendars WHERE id = ?", id)

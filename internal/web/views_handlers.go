@@ -10,6 +10,23 @@ import (
 	"github.com/furryfoxcorp/calshare/internal/storage"
 )
 
+// handleGenPassword returns a fresh random password inside a replacement input
+// element, for the token form's Generate button.
+func (s *Server) handleGenPassword(w http.ResponseWriter, r *http.Request) {
+	pw, err := generateAppPassword()
+	if err != nil {
+		http.Error(w, "error", http.StatusInternalServerError)
+		return
+	}
+	// Trim to a friendlier 14 characters for a share-link password.
+	pw = strings.ReplaceAll(pw, "-", "")
+	if len(pw) > 14 {
+		pw = pw[:14]
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_, _ = w.Write([]byte(`<input type="text" id="password" name="password" value="` + pw + `">`))
+}
+
 func (s *Server) handleViews(w http.ResponseWriter, r *http.Request) {
 	user, _ := oidc.UserFromContext(r.Context())
 	views, _ := s.db.ViewsForUser(r.Context(), user.ID)

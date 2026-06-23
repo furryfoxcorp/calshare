@@ -1,0 +1,18 @@
+{{define "title"}}Tasks - {{.Data.Calendar.DisplayName}}{{end}}
+{{define "content"}}
+<p style="margin:0 0 6px"><a href="/calendars/{{.Data.Calendar.ID}}">&larr; {{.Data.Calendar.DisplayName}}</a></p>
+<h2>Tasks</h2>
+<p class="sub">Tasks (VTODO) on {{.Data.Calendar.DisplayName}}. Add and complete them in your calendar app.</p>
+
+<div class="panel">
+  {{if .Data.Tasks}}
+    {{range .Data.Tasks}}
+    <div class="row">
+      <span class="grow"><span class="title">{{.Summary}}</span><div class="meta">{{.Status}}{{if .Due}} &middot; due {{.Due}}{{end}}</div></span>
+    </div>
+    {{end}}
+  {{else}}
+    <div class="empty">No tasks on this calendar.</div>
+  {{end}}
+</div>
+{{end}}
