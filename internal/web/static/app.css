@@ -25,6 +25,13 @@
   --danger-bot: #c44e22;
   --radius: 5px;
   --shadow-sheet: 0 18px 40px rgba(0,0,0,0.35);
+
+  /* Material textures: inline SVG fractal noise, no binary assets. These give
+     the surfaces actual tooth (woven linen, pebbled leather, paper fiber)
+     instead of smooth gradients. Blended over the base colors below. */
+  --tex-linen: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90'%3E%3Cfilter id='l'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='linear' slope='1.35' intercept='-0.17'/%3E%3CfeFuncG type='linear' slope='1.35' intercept='-0.17'/%3E%3CfeFuncB type='linear' slope='1.35' intercept='-0.17'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='90' height='90' filter='url(%23l)'/%3E%3C/svg%3E");
+  --tex-leather: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='linear' slope='0.6' intercept='0.2'/%3E%3CfeFuncG type='linear' slope='0.6' intercept='0.2'/%3E%3CfeFuncB type='linear' slope='0.6' intercept='0.2'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23g)'/%3E%3C/svg%3E");
+  --tex-paper: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23p)'/%3E%3C/svg%3E");
 }
 
 * { box-sizing: border-box; }
@@ -38,13 +45,14 @@ body {
   font-family: "Lucida Grande", "Helvetica Neue", Helvetica, Arial, sans-serif;
   font-size: 13px;
   color: var(--ink);
-  /* Linen: warm gray base with a faint woven noise. */
+  /* Linen: warm gray base with a real woven-noise tooth and a soft vignette. */
   background-color: var(--linen);
   background-image:
-    linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px),
-    radial-gradient(circle at 50% 0%, rgba(255,255,255,0.25), rgba(0,0,0,0.06));
-  background-size: 3px 3px, 3px 3px, 100% 100%;
+    var(--tex-linen),
+    radial-gradient(circle at 50% 0%, rgba(255,255,255,0.20), rgba(0,0,0,0.08));
+  /* A single fine weave pass: enough tooth to read as fabric, not fuzz. */
+  background-size: 90px 90px, 100% 100%;
+  background-blend-mode: soft-light, normal;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -58,7 +66,10 @@ a:hover { text-decoration: underline; }
   background: var(--paper);
   border: 1px solid #8f8a80;
   border-radius: 8px;
-  box-shadow: 0 1px 0 rgba(255,255,255,0.6) inset, 0 12px 30px rgba(0,0,0,0.28);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.6) inset,
+    0 2px 5px rgba(0,0,0,0.16),
+    0 18px 44px rgba(0,0,0,0.32);
   overflow: hidden;
 }
 
@@ -68,9 +79,16 @@ a:hover { text-decoration: underline; }
   padding: 14px 20px 16px;
   color: #f4ece0;
   background:
+    var(--tex-leather),
     linear-gradient(rgba(255,255,255,0.06), rgba(0,0,0,0.18)),
     radial-gradient(circle at 30% -20%, var(--leather-light), var(--leather) 55%, var(--leather-dark));
+  background-size: 200px 200px, 100% 100%, 100% 100%;
+  background-blend-mode: overlay, normal, normal;
   border-bottom: 3px solid var(--leather-dark);
+  /* Lit top binding edge + a soft inner shadow so the leather reads as thick. */
+  box-shadow:
+    inset 0 1px 0 rgba(255,236,205,0.22),
+    inset 0 -10px 16px rgba(0,0,0,0.30);
   text-shadow: 0 -1px 0 rgba(0,0,0,0.6);
 }
 .leather::after {
@@ -133,7 +151,13 @@ a:hover { text-decoration: underline; }
 }
 .toolbar .who { color: #444; font-size: 12px; text-shadow: 0 1px 0 rgba(255,255,255,0.6); }
 
-.content { padding: 22px 24px 28px; }
+.content {
+  padding: 22px 24px 28px;
+  background-color: var(--paper);
+  background-image: var(--tex-paper);
+  background-size: 120px 120px;
+  background-blend-mode: soft-light;
+}
 
 h2 {
   margin: 0 0 4px;
@@ -193,26 +217,38 @@ section { margin-bottom: 30px; }
   color: #f7fbff;
   padding: 5px 14px;
   border: 1px solid var(--aqua-edge);
-  border-radius: var(--radius);
-  background: linear-gradient(var(--aqua-top), var(--aqua-mid) 48%, var(--aqua-bot));
-  box-shadow: 0 1px 0 rgba(255,255,255,0.55) inset, 0 1px 1px rgba(0,0,0,0.18);
+  border-radius: 9px;
+  /* Jelly Aqua: a bright specular sheen over the top half, then the gradient. */
+  background:
+    linear-gradient(rgba(255,255,255,0.65), rgba(255,255,255,0.08) 48%, rgba(255,255,255,0) 50%),
+    linear-gradient(var(--aqua-top), var(--aqua-mid) 48%, var(--aqua-bot));
+  box-shadow: 0 1px 0 rgba(255,255,255,0.6) inset, 0 1px 2px rgba(0,0,0,0.22);
   text-shadow: 0 -1px 0 rgba(0,0,0,0.35);
   cursor: pointer;
 }
 .btn:hover { filter: brightness(1.05); text-decoration: none; }
-.btn:active { background: linear-gradient(var(--aqua-bot), var(--aqua-mid)); box-shadow: 0 1px 3px rgba(0,0,0,0.35) inset; }
+.btn:active {
+  background:
+    linear-gradient(rgba(255,255,255,0.2), rgba(255,255,255,0) 50%),
+    linear-gradient(var(--aqua-bot), var(--aqua-mid));
+  box-shadow: 0 1px 3px rgba(0,0,0,0.35) inset;
+}
 
 .btn-secondary {
   color: #333;
   border-color: #9a9a9a;
-  background: linear-gradient(#ffffff, #dcdcdc);
+  background:
+    linear-gradient(rgba(255,255,255,0.9), rgba(255,255,255,0.1) 50%, rgba(255,255,255,0) 51%),
+    linear-gradient(#fbfbfb, #d6d6d6);
   text-shadow: 0 1px 0 rgba(255,255,255,0.8);
 }
 .btn-secondary:active { background: linear-gradient(#cfcfcf, #e6e6e6); }
 
 .btn-danger {
   border-color: var(--danger-bot);
-  background: linear-gradient(var(--danger-top), var(--danger-mid) 48%, var(--danger-bot));
+  background:
+    linear-gradient(rgba(255,255,255,0.6), rgba(255,255,255,0.06) 48%, rgba(255,255,255,0) 50%),
+    linear-gradient(var(--danger-top), var(--danger-mid) 48%, var(--danger-bot));
 }
 
 .btn-sm { padding: 3px 9px; font-size: 11px; }
